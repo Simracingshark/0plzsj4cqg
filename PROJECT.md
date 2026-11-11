@@ -19,7 +19,7 @@ scraper/shops.json        список источников: id, name, type, url
 scraper/common.py         HTTP (пауза 1 с между запросами), нормализация: материал, вес, бренд, цвет, диаметр, фильтр не-филамента
 scraper/sources/hotline.py      каталог Hotline, 27 стр. x 48
 scraper/sources/opencart.py     магазины OpenCart/Journal (3ddevice)
-scraper/sources/prom_seller.py  продавец Prom: ItemList со страницы компании + ld+json каждого товара
+scraper/sources/prom_seller.py  продавец Prom: JSON товаров со страницы компании, ?page=N (разбор из prom_search); brand из конфига, если нет в названии
 scraper/sources/ldjson.py       разбор schema.org Product/ItemList
 scraper/sources/woocommerce.py  WooCommerce Store API /wp-json/wc/store/v1/products (цена в копейках)
 scraper/sources/shopify.py      Shopify /products.json, каждый вариант — отдельная позиция
@@ -54,7 +54,7 @@ tools/make_icons.py       генерит icon-192/512.png без библиот�
 |---|---|---|
 | Hotline `/ua/computer/rashodnye-materialy-dlya-3d-printerov/?p=N` | ~1230 товаров с предложениями: мин–макс цена, число предложений, материал, вес | Цены по отдельным магазинам Hotline намеренно прячет (цены-приманки в HTML, настоящие собираются скриптом). Не обходим. |
 | 3ddevice.com.ua `/en/shop/3d-plastics/?page=N` | ~340 позиций, бренд, цена; нет цены у товаров не в наличии | Наличие определяем по классу `out-of-stock` карточки (TENTATIVE) |
-| Prom, продавец PlastFill `c3804832-plastfill` | 29 позиций (22 филамента), цена, наличие из ld+json | По просьбе пользователя |
+| Prom, продавец PlastFill `c3804832-plastfill` | 246 позиций (с 2026-11-11 все страницы `?page=N`, раньше брались только 29 с первой), наличие из JSON Prom | Бренд не отдаётся, ставим Plexiwire из конфига (TENTATIVE: магазин похож на дилера только Plexiwire) |
 | ek.ua | — | 403 Cloudflare |
 
 Профильные магазины (локальный прогон 2026-11-11, позиций после фильтра): UA3D 780 (woo), BambuLab UA bambulab.net.ua 717 (woo), Тірапласт 156 (woo), DC Print 154 (woo), PYD 187 (shopify), 3DPlast 127, Filament Shop 30, BOZE 73, Bambu UA bambu.net.ua 276, ALL3DP 254, SUNLU3D 168 (cards), 3D4U 12, PBL 8, UA3D.Pro 807, U3DF 9 (ld_listing). Маркетплейсы и др.: Rozetka 5434 (ld_listing, вся категория «Витратні матеріали для 3D-принтерів» c4671751, до 150 стр.), Allo 606 (ld_listing, `/p-{n}/`), Prom 900 (prom_search: поиск по 10 фразам × 5 стр., у товара поле `seller`), MonoFilament 223 (свой модуль monofilament.py).

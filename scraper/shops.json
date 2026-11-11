@@ -35,7 +35,7 @@
    "urls": ["https://u3df.com.ua/ua/product_list"], "page": "/page_{n}"},
 
   {"id": "plastfill", "name": "PlastFill (Prom)", "type": "prom_seller",
-   "url": "https://prom.ua/ua/c3804832-plastfill.html"},
+   "url": "https://prom.ua/ua/c3804832-plastfill.html", "brand": "Plexiwire"},
 
   {"id": "allo", "name": "Allo", "type": "ld_listing", "every_h": 11.5,
    "urls": ["https://allo.ua/ua/plastik-dlja-3d-pechati/"], "page": "/p-{n}/"},

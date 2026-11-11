@@ -1,26 +1,22 @@
-"""Отдельный продавец на Prom: список товаров со страницы компании, цена и наличие со страницы товара."""
-import re
-
-from common import get
-from sources import ldjson
+"""Отдельный продавец на Prom: все товары со страницы компании, листаем ?page=N.
+Товары лежат в JSON состояния страницы, как в поиске (разбор из prom_search).
+Конфиг: brand — бренд, если в названии его нет (бренда в JSON Prom нет)."""
+from common import brand, get
+from sources import prom_search
 
 
 def scrape(shop):
-    base = shop["url"].removesuffix(".html")
-    urls = []
-    for page in range(1, 30):
-        html = get(shop["url"] if page == 1 else f"{base}/page_{page}.html")
-        lst = ldjson.find(html, "ItemList") or {}
-        new = [i["url"] for i in lst.get("itemListElement", []) if i.get("url") not in urls]
-        urls += new
-        if not new or len(urls) >= int(lst.get("numberOfItems") or 0):
+    out, seen = [], set()
+    for n in range(1, 40):
+        got = [o for o in prom_search.parse(shop, get(shop["url"] + (f"?page={n}" if n > 1 else "")))
+               if o["id"] not in seen]
+        if not got:
             break
-    out = []
-    for u in urls:
-        p = ldjson.product(get(u))
-        if not p or not p["title"]:
-            continue
-        p.update(shop=shop["name"], source="prom", url=u,
-                 id="prom:" + re.search(r"/p(\d+)-", u).group(1))
-        out.append(p)
+        seen.update(o["id"] for o in got)
+        out += got
+    for o in out:
+        o["id"] = "prom:" + o["id"].split(":", 1)[1]  # прежний формат id, чтобы не терять историю
+        o["seller"] = None
+        if shop.get("brand") and not brand(o["title"]):
+            o["brand"] = shop["brand"]
     return out
