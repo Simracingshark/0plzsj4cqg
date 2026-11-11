@@ -35,6 +35,8 @@ def scrape(shop):
                 "stock": "in" if p.get("is_in_stock") else "out",
                 "url": p.get("permalink"),
                 "image": imgs[0].get("thumbnail") if imgs else None,
+                "price_old": int(pr["regular_price"]) / k
+                if pr.get("on_sale") and pr.get("regular_price") and not rng else None,
             })
         if len(batch) < 100:
             break

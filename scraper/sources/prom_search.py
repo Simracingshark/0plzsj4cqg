@@ -34,6 +34,9 @@ def parse(shop, page):
             "price": cost,
             "stock": PRESENCE.get(pres, "unknown"),
             "url": f"https://prom.ua/ua/p{p['id']}-{p.get('urlText') or 'item'}.html",
+            "image": p.get("image"),
+            "price_old": float(p["price"]) if p.get("hasDiscount") and p.get("price") and
+            cost and float(p["price"]) > cost else None,
         })
     return out
 

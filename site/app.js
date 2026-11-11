@@ -5,7 +5,8 @@ const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": 
 const num = (v, d = 0) => v == null || isNaN(v) ? "—" : Number(v).toLocaleString("uk-UA", { maximumFractionDigits: d });
 const STOCK = { in: "в наявності", order: "під замовлення", out: "немає", unknown: "невідомо" };
 const MAT_NAME = m => m === "Other" ? "Інше" : m;
-const PAGE = 50;
+const PAGE = 40;
+const plural = (n, one, few, many) => { const a = n % 10, b = n % 100; return a === 1 && b !== 11 ? one : a >= 2 && a <= 4 && (b < 12 || b > 14) ? few : many; };
 
 // localStorage может быть недоступен (приватный режим) — всё оборачиваем
 const store = {
@@ -24,17 +25,47 @@ const COLORS = [
   [/коричн|brown|шокол|chocolate|wood|дерев/i, "#8a5a3b"], [/беж|beige|пісоч|sand|tan\b|крем|cream/i, "#e0cca4"],
   [/мідн|медн|copper|бронз|bronze/i, "#b8723e"],
 ];
+const colorOf = s => { for (const [rx, c] of COLORS) if (rx.test(s)) return c; return null; };
 function swatch(i) {
-  const s = (i.color || "") + " " + i.title;
-  for (const [rx, c] of COLORS) if (rx.test(s)) return c === "clear" ? `<i class="sw clear"></i>` : `<i class="sw" style="--c:${c}"></i>`;
-  return `<i class="sw unknown"></i>`;
+  const c = colorOf((i.color || "") + " " + i.title);
+  return c === "clear" ? `<i class="sw clear"></i>` : c ? `<i class="sw" style="--c:${c}"></i>` : `<i class="sw unknown"></i>`;
+}
+// фото магазина поверх кружка цвета; если картинка не загрузилась — остаётся кружок
+const photo = (i, cls = "ph") => `<span class="${cls}">${swatch(i)}${i.image ? `<img src="${esc(i.image)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.remove()">` : ""}</span>`;
+
+/* катушка в SVG, окрашенная в цвет материала */
+const MAT_HUE = { "PLA": 265, "PLA+": 295, "PETG": 210, "ABS": 30, "ASA": 50, "TPU": 150, "CoPET": 185, "PCTG": 225,
+  "PLA-CF": 0, "PETG-CF": 0, "PA-CF": 0, "PA": 330, "PC": 240, "PET": 175, "PVA": 100, "HIPS": 70, "PP": 120, "PEEK": 60, "PBT": 280, "Wood": 55 };
+function spool(m, size = 84) {
+  const h = MAT_HUE[m], cf = m.endsWith("-CF") || h == null;
+  const c1 = cf ? "#5b5c63" : `oklch(.80 .13 ${h})`, c2 = cf ? "#2a2b30" : `oklch(.56 .16 ${h})`;
+  const id = "sp" + m.replace(/\W/g, "");
+  return `<svg class="spool" viewBox="0 0 120 100" width="${size}" aria-hidden="true">
+    <defs><linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:${c1}"/><stop offset="1" style="stop-color:${c2}"/></linearGradient>
+    <pattern id="${id}w" width="3" height="100" patternUnits="userSpaceOnUse"><rect width="1.2" height="100" fill="#000" opacity=".13"/></pattern></defs>
+    <ellipse cx="28" cy="50" rx="11" ry="40" class="fl-back"/>
+    <rect x="28" y="16" width="62" height="68" fill="url(#${id})"/><rect x="28" y="16" width="62" height="68" fill="url(#${id}w)"/>
+    <rect x="28" y="20" width="62" height="7" fill="#fff" opacity=".22"/>
+    <ellipse cx="90" cy="50" rx="13" ry="42" class="fl"/><ellipse cx="90" cy="50" rx="10" ry="36" class="fl-in"/>
+    <ellipse cx="91" cy="50" rx="4.5" ry="13" class="hub"/>
+  </svg>`;
 }
 
+const TAG_NAME = { matte: "Matte", silk: "Silk", hs: "High Speed", cf: "Карбон CF", gf: "Скловолокно GF", glow: "Світиться",
+  marble: "Мармур", transp: "Прозорий", multi: "Багатоколірний", metal: "Металік", refill: "Рефіл" };
+const WEIGHTS = [["s", "≤ 0,5 кг", w => w <= .55], ["m", "0,6–0,9 кг", w => w > .55 && w < .95], ["1", "1 кг", w => w >= .95 && w <= 1.05],
+  ["l", "1,1–1,5 кг", w => w > 1.05 && w <= 1.6], ["xl", "2–3 кг", w => w > 1.6 && w <= 3.2], ["xxl", "від 4 кг", w => w > 3.2]];
+const MAT_ORDER = ["PLA", "PETG", "PLA+", "ABS", "TPU", "ASA", "CoPET", "PLA-CF", "PETG-CF", "PA-CF", "PA", "PC", "PCTG", "PET", "PVA", "HIPS", "PP", "PEEK", "PBT", "Wood", "Other"];
+const NOBRAND = /без бренд|no ?name|noname|unbranded|generic/i;
+const matRank = m => { const k = MAT_ORDER.indexOf(m); return k < 0 ? 98 : k; };
+
 let DATA = { items: [], shops: [] }, HIST = null, shown = PAGE;
-const BEST = new Map();
+const BEST = new Map(), MST = new Map(), GROUPS = new Map();
 const favs = new Set(store.get("favs", []));
 const settings = Object.assign({ city: "", del: 0, free: 0 }, store.get("settings", {}));
-const F = Object.assign({ q: "", mat: "", brand: "", shop: "", sort: "ppk", stock: true, fav: false, hot: true, weight: "" }, store.get("f2", {}));
+const F0 = () => ({ q: "", mat: "", tags: [], colors: [], brands: [], shop: "", w: [], stock: "in", fav: false, hot: true,
+  group: true, sale: false, ppkMin: "", ppkMax: "", pMin: "", pMax: "", sort: "ppk" });
+const F = Object.assign(F0(), store.get("f3", {}));
 const byId = new Map();
 
 /* ---------- тема ---------- */
@@ -57,13 +88,16 @@ async function load() {
     return;
   }
   DATA.items.forEach(i => byId.set(i.id, i));
-  computeBest();
+  computeStats();
   const shops = new Set(DATA.items.filter(i => i.src !== "hotline").map(i => i.shop)).size;
+  const brands = new Set(DATA.items.map(i => i.brand).filter(Boolean)).size;
   const when = new Date(DATA.updated).toLocaleString("uk-UA", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
   $("#stats").textContent = `${num(DATA.items.length)} позицій · ${shops} магазинів · ${when}`;
-  fillSelect("#f-brand", countBy(DATA.items, "brand"));
-  fillSelect("#f-shop", countBy(DATA.items, "shop"));
-  renderMats(); syncFilterUI(); render(); renderBest(); renderShops();
+  $("#h-upd").textContent = "Ціни оновлено " + when;
+  $("#h-stats").innerHTML = [[DATA.items.length, "позицій"], [shops, "магазинів"], [brands, "брендів"]]
+    .map(([n, t]) => `<div><b>${num(n)}</b><span>${t}</span></div>`).join("");
+  fillShops();
+  renderHome(); renderMats(); render(); renderShops();
 }
 async function history() {
   if (HIST) return HIST;
@@ -75,20 +109,19 @@ function countBy(xs, k) {
   xs.forEach(x => x[k] && m.set(x[k], (m.get(x[k]) || 0) + 1));
   return [...m].sort((a, b) => b[1] - a[1]);
 }
-function fillSelect(sel, pairs) {
-  $(sel).insertAdjacentHTML("beforeend", pairs.map(([v, n]) => `<option value="${esc(v)}">${esc(v)} · ${n}</option>`).join(""));
+function fillShops() {
+  $("#f-shop").insertAdjacentHTML("beforeend", countBy(DATA.items, "shop").map(([v, n]) => `<option value="${esc(v)}">${esc(v)} · ${n}</option>`).join(""));
 }
-// по каждому материалу: минимум, медиана, 90-й перцентиль ₴/кг (в наличии, без Hotline)
-const MST = new Map();
-function computeBest() {
-  BEST.clear(); MST.clear();
+// по каждому материалу: минимум, медиана, 90-й перцентиль ₴/кг (в наличии, без Hotline); группы одинаковых товаров
+function computeStats() {
+  BEST.clear(); MST.clear(); GROUPS.clear();
   const by = new Map();
   for (const i of DATA.items) {
+    if (i.group) (GROUPS.get(i.group) || GROUPS.set(i.group, []).get(i.group)).push(i);
     if (i.stock !== "in" || !i.ppk || i.src === "hotline") continue;
     const b = BEST.get(i.material);
     if (!b || i.ppk < b) BEST.set(i.material, i.ppk);
-    if (!by.has(i.material)) by.set(i.material, []);
-    by.get(i.material).push(i.ppk);
+    (by.get(i.material) || by.set(i.material, []).get(i.material)).push(i.ppk);
   }
   for (const [m, xs] of by) {
     xs.sort((a, b) => a - b);
@@ -96,9 +129,6 @@ function computeBest() {
     MST.set(m, { min: xs[0], med: q(.5), p90: q(.9), n: xs.length });
   }
 }
-/* цвет точки материала */
-const MAT_HUE = { "PLA": 265, "PLA+": 290, "PETG": 200, "ABS": 25, "ASA": 45, "TPU": 150, "CoPET": 185, "PCTG": 215,
-  "PLA-CF": 0, "PETG-CF": 0, "PA-CF": 0, "PA": 330, "PC": 230, "PET": 175, "PVA": 95, "HIPS": 60 };
 const matDot = m => m in MAT_HUE ? `<i class="mdot" style="--h:${MAT_HUE[m]}"${m.endsWith("-CF") ? " data-cf" : ""}></i>` : "";
 const shopName = i => i.src === "hotline" ? `Hotline · ${i.offers} пропоз.` : esc(i.shop) + (i.seller ? ` · ${esc(i.seller)}` : "");
 // на сколько процентов ₴/кг ниже медианы материала
@@ -107,157 +137,269 @@ function deal(i) {
   if (!st || !i.ppk || i.src === "hotline" || st.n < 5) return 0;
   return Math.round((1 - i.ppk / st.med) * 100);
 }
+const sale = i => i.price_old && i.price ? Math.round((1 - i.price / i.price_old) * 100) : 0;
+const disc = i => Math.max(sale(i), i.drop || 0);
 
-/* ---------- фильтры ---------- */
-function saveF() { store.set("f2", F); }
-function renderMats() {
-  const counts = countBy(DATA.items.filter(i => !F.stock || i.stock === "in"), "material");
-  $("#mats").innerHTML = `<button class="chip ${F.mat ? "" : "on"}" data-m="">Усі</button>` +
-    counts.map(([m, n]) => `<button class="chip ${F.mat === m ? "on" : ""}" data-m="${esc(m)}">${matDot(m)}${esc(MAT_NAME(m))} <small>${n}</small></button>`).join("");
-  renderPulse();
-}
-/* полоса «пульс ринку»: мин. и медиана ₴/кг по ходовым материалам */
-function renderPulse() {
-  const mats = ["PLA", "PETG", "PLA+", "ABS", "TPU", "ASA", "CoPET", "PA-CF", "PLA-CF", "PETG-CF", "PC", "PA"].filter(m => MST.has(m));
-  $("#pulse").innerHTML = mats.map(m => {
-    const st = MST.get(m), spread = Math.min(100, Math.round(st.min / st.med * 100));
-    return `<button class="pcard ${F.mat === m ? "on" : ""}" data-m="${esc(m)}">
-      <span class="pm">${matDot(m)}${esc(m)}</span>
-      <b>${num(st.min)}<small> ₴/кг</small></b>
-      <span class="pbar"><i style="width:${spread}%"></i></span>
-      <span class="pmed">медіана ${num(st.med)} · ${num(st.n)}</span>
-    </button>`;
+/* ---------- главная ---------- */
+function renderHome() {
+  const inStock = DATA.items.filter(i => i.stock === "in");
+  const mats = countBy(inStock, "material").filter(([m]) => m !== "Other" && MST.has(m))
+    .sort((a, b) => matRank(a[0]) - matRank(b[0])).slice(0, 12);
+  $("#h-mats").innerHTML = mats.map(([m, n]) => `<button class="mat-tile" data-mat="${esc(m)}">
+    ${spool(m)}<span class="mt-n">${esc(m)}</span>
+    <span class="mt-p">від <b>${num(MST.get(m).min)}</b> ₴/кг</span><span class="mt-c">${num(n)} у наявності</span></button>`).join("");
+
+  const tc = new Map();
+  inStock.forEach(i => (i.tags || []).forEach(t => tc.set(t, (tc.get(t) || 0) + 1)));
+  $("#h-tags").innerHTML = Object.keys(TAG_NAME).filter(t => tc.get(t)).map(t =>
+    `<button class="tagchip" data-tag="${t}">${esc(TAG_NAME[t])}<small>${num(tc.get(t))}</small></button>`).join("");
+
+  const deals = inStock.filter(i => i.src !== "hotline" && disc(i) >= 5).sort((a, b) => disc(b) - disc(a));
+  const seen = new Set();
+  const top = deals.filter(i => { const k = i.group || i.id; if (seen.has(k)) return false; seen.add(k); return true; }).slice(0, 16);
+  $("#h-deals-h").hidden = $("#h-deals").hidden = !top.length;
+  $("#h-deals").innerHTML = top.map(i => `<button class="deal-card" data-id="${esc(i.id)}">
+    ${photo(i, "ph big")}<span class="badge sale">−${disc(i)}%</span>
+    <span class="dc-t">${esc(i.title)}</span>
+    <span class="dc-p"><b>${num(i.price)} ₴</b>${i.price_old ? `<s>${num(i.price_old)}</s>` : ""}</span>
+    <span class="dc-s">${shopName(i)}</span></button>`).join("");
+
+  const brands = countBy(inStock, "brand").filter(([b]) => !NOBRAND.test(b)).slice(0, 12);
+  $("#h-brands").innerHTML = brands.map(([b, n]) => {
+    const ppk = Math.min(...inStock.filter(i => i.brand === b && i.ppk && i.src !== "hotline").map(i => i.ppk));
+    return `<button class="brand-tile" data-brand="${esc(b)}"><span class="mono" style="--h:${[...b].reduce((a, c) => a + c.charCodeAt(0), 0) % 360}">${esc(b.slice(0, 2))}</span>
+      <span class="bt-n">${esc(b)}</span><span class="bt-c">${num(n)} · від ${isFinite(ppk) ? num(ppk) : "—"} ₴/кг</span></button>`;
   }).join("");
 }
-$("#pulse").addEventListener("click", e => {
-  const b = e.target.closest("[data-m]");
-  if (!b) return;
-  F.mat = F.mat === b.dataset.m ? "" : b.dataset.m; saveF(); renderMats(); render();
-});
+function openCatalog(patch) {
+  Object.assign(F, F0(), { group: F.group, hot: F.hot, sort: F.sort }, patch);
+  saveF(); renderMats(); render(); go("list");
+}
+$("#h-mats").addEventListener("click", e => { const b = e.target.closest("[data-mat]"); if (b) openCatalog({ mat: b.dataset.mat }); });
+$("#h-tags").addEventListener("click", e => { const b = e.target.closest("[data-tag]"); if (b) openCatalog({ tags: [b.dataset.tag] }); });
+$("#h-brands").addEventListener("click", e => { const b = e.target.closest("[data-brand]"); if (b) openCatalog({ brands: [b.dataset.brand] }); });
+$("#h-deals").addEventListener("click", e => { const b = e.target.closest("[data-id]"); if (b) openItem(b.dataset.id); });
+$("#h-allbrands").onclick = () => { go("list"); openFilters("f-brands"); };
+$$("[data-goto]").forEach(b => b.onclick = () => go(b.dataset.goto));
+$("#hq").addEventListener("keydown", e => { if (e.key === "Enter") { openCatalog({ q: e.target.value }); e.target.blur(); } });
+
+/* ---------- фильтры ---------- */
+function saveF() { store.set("f3", F); }
+function renderMats() {
+  const counts = countBy(DATA.items.filter(i => stockOk(i)), "material").sort((a, b) => matRank(a[0]) - matRank(b[0]));
+  $("#mats").innerHTML = `<button class="chip ${F.mat ? "" : "on"}" data-m="">Усі</button>` +
+    counts.map(([m, n]) => `<button class="chip ${F.mat === m ? "on" : ""}" data-m="${esc(m)}">${matDot(m)}${esc(MAT_NAME(m))} <small>${n}</small></button>`).join("");
+  $("#q").value = F.q;
+  $("#sort-btn").textContent = "↕ " + SORTS[F.sort];
+  const n = activeFilters().length - (F.mat ? 1 : 0) - (F.q ? 1 : 0);
+  $("#fcount").hidden = !n; $("#fcount").textContent = n;
+  $("#active-f").innerHTML = activeFilters().map(([k, label]) => `<button class="af" data-k="${esc(k)}">${esc(label)} <span>✕</span></button>`).join("");
+}
 $("#mats").addEventListener("click", e => {
   const b = e.target.closest("[data-m]");
   if (!b) return;
   F.mat = b.dataset.m; saveF(); renderMats(); render();
 });
 let qTimer;
-$("#q").addEventListener("input", e => { clearTimeout(qTimer); qTimer = setTimeout(() => { F.q = e.target.value; saveF(); render(); }, 150); });
+$("#q").addEventListener("input", e => { clearTimeout(qTimer); qTimer = setTimeout(() => { F.q = e.target.value; saveF(); renderMats(); render(); }, 150); });
 
-const SORTS = { ppk: "₴ за кг ↑", price: "₴ за штуку ↑", name: "за назвою" };
-function syncFilterUI() {
-  $("#q").value = F.q;
-  $$("#f-sort button").forEach(b => b.classList.toggle("on", b.dataset.s === F.sort));
-  $$("#f-weight button").forEach(b => b.classList.toggle("on", b.dataset.w === F.weight));
-  $("#f-stock").checked = F.stock; $("#f-fav").checked = F.fav; $("#f-hot").checked = F.hot;
-  if ([...$("#f-brand").options].some(o => o.value === F.brand)) $("#f-brand").value = F.brand;
-  if ([...$("#f-shop").options].some(o => o.value === F.shop)) $("#f-shop").value = F.shop;
-  $("#sort-btn").textContent = "Сортування: " + SORTS[F.sort];
-  const n = [F.brand, F.shop, F.fav, !F.hot, F.weight, !F.stock].filter(Boolean).length;
-  $("#fcount").hidden = !n; $("#fcount").textContent = n;
+const SORTS = { ppk: "₴/кг ↑", ppk_d: "₴/кг ↓", price: "за котушку ↑", disc: "знижка", new: "нові", name: "назва" };
+// активные фильтры в виде снимаемых «пилюль» над списком
+function activeFilters() {
+  const a = [];
+  if (F.q) a.push(["q", `«${F.q}»`]);
+  if (F.mat) a.push(["mat", MAT_NAME(F.mat)]);
+  F.tags.forEach(t => a.push(["tags:" + t, TAG_NAME[t]]));
+  F.colors.forEach(c => a.push(["colors:" + c, c]));
+  F.brands.forEach(b => a.push(["brands:" + b, b]));
+  F.w.forEach(w => a.push(["w:" + w, WEIGHTS.find(x => x[0] === w)?.[1] || w]));
+  if (F.shop) a.push(["shop", F.shop]);
+  if (F.stock !== "in") a.push(["stock", F.stock === "all" ? "з відсутніми" : "+ під замовлення"]);
+  if (F.ppkMin || F.ppkMax) a.push(["ppk", `${F.ppkMin || 0}–${F.ppkMax || "∞"} ₴/кг`]);
+  if (F.pMin || F.pMax) a.push(["p", `${F.pMin || 0}–${F.pMax || "∞"} ₴`]);
+  if (F.sale) a.push(["sale", "зі знижкою"]);
+  if (F.fav) a.push(["fav", "★ обране"]);
+  if (!F.hot) a.push(["hot", "без Hotline"]);
+  return a;
 }
-$("#open-filters").onclick = () => { syncFilterUI(); $("#filters").showModal(); };
+$("#active-f").addEventListener("click", e => {
+  const b = e.target.closest("[data-k]");
+  if (!b) return;
+  const [k, v] = b.dataset.k.split(/:(.*)/s);
+  if (v !== undefined) F[k] = F[k].filter(x => x !== v);
+  else if (k === "ppk") F.ppkMin = F.ppkMax = "";
+  else if (k === "p") F.pMin = F.pMax = "";
+  else F[k] = F0()[k];
+  saveF(); renderMats(); render();
+});
 $("#sort-btn").onclick = () => {
   const ks = Object.keys(SORTS); F.sort = ks[(ks.indexOf(F.sort) + 1) % ks.length];
-  saveF(); syncFilterUI(); render();
-};
-$$("#f-sort button").forEach(b => b.onclick = () => $$("#f-sort button").forEach(x => x.classList.toggle("on", x === b)));
-$$("#f-weight button").forEach(b => b.onclick = () => $$("#f-weight button").forEach(x => x.classList.toggle("on", x === b)));
-$("#f-apply").onclick = () => {
-  F.sort = $("#f-sort .on").dataset.s; F.weight = $("#f-weight .on").dataset.w;
-  F.stock = $("#f-stock").checked; F.fav = $("#f-fav").checked; F.hot = $("#f-hot").checked;
-  F.brand = $("#f-brand").value; F.shop = $("#f-shop").value;
-  saveF(); syncFilterUI(); renderMats(); render(); $("#filters").close();
-};
-$("#f-reset").onclick = () => {
-  Object.assign(F, { brand: "", shop: "", sort: "ppk", stock: true, fav: false, hot: true, weight: "" });
-  $("#f-brand").value = ""; $("#f-shop").value = "";
-  syncFilterUI();
+  saveF(); renderMats(); render();
 };
 
+/* шторка фильтров: всё применяется сразу, кнопка показывает число найденного */
+const toggleIn = (arr, v) => arr.includes(v) ? arr.filter(x => x !== v) : [...arr, v];
+function renderFilterSheet() {
+  const base = DATA.items.filter(stockOk);
+  const pills = (el, opts, isOn, attr) => $(el).innerHTML = opts.map(([v, label, n]) =>
+    `<button data-${attr}="${esc(v)}" class="${isOn(v) ? "on" : ""}">${label}${n != null ? ` <small>${num(n)}</small>` : ""}</button>`).join("");
+  $$("#f-sort button").forEach(b => b.classList.toggle("on", b.dataset.s === F.sort));
+  $$("#f-stock button").forEach(b => b.classList.toggle("on", b.dataset.v === F.stock));
+  pills("#f-mat", [["", "Усі"], ...countBy(base, "material").sort((a, b) => matRank(a[0]) - matRank(b[0]))
+    .map(([m, n]) => [m, matDot(m) + esc(MAT_NAME(m)), n])], v => v === F.mat, "m");
+  const tc = new Map(); base.forEach(i => (i.tags || []).forEach(t => tc.set(t, (tc.get(t) || 0) + 1)));
+  pills("#f-tags", Object.keys(TAG_NAME).filter(t => tc.get(t)).map(t => [t, esc(TAG_NAME[t]), tc.get(t)]), v => F.tags.includes(v), "t");
+  $("#f-colors").innerHTML = countBy(base, "color").slice(0, 24).map(([c, n]) => {
+    const hex = colorOf(c);
+    return `<button data-c="${esc(c)}" class="${F.colors.includes(c) ? "on" : ""}" title="${esc(c)}">
+      <i class="sw ${hex === "clear" ? "clear" : hex ? "" : "unknown"}" ${hex && hex !== "clear" ? `style="--c:${hex}"` : ""}></i><span>${esc(c)}</span></button>`;
+  }).join("");
+  const bq = $("#f-brand-q").value.toLowerCase();
+  pills("#f-brands", countBy(base, "brand").filter(([b]) => !bq || b.toLowerCase().includes(bq) || F.brands.includes(b))
+    .map(([b, n]) => [b, esc(b), n]), v => F.brands.includes(v), "b");
+  pills("#f-weight", WEIGHTS.map(([k, label, fn]) => [k, label, base.filter(i => i.weight && fn(i.weight)).length]), v => F.w.includes(v), "w");
+  $("#f-ppk-min").value = F.ppkMin; $("#f-ppk-max").value = F.ppkMax; $("#f-p-min").value = F.pMin; $("#f-p-max").value = F.pMax;
+  $("#f-shop").value = F.shop;
+  $("#f-group").checked = F.group; $("#f-sale").checked = F.sale; $("#f-fav").checked = F.fav; $("#f-hot").checked = F.hot;
+  $("#f-apply").textContent = `Показати ${num(rows().length)}`;
+}
+function fChanged() { saveF(); renderMats(); render(); renderFilterSheet(); }
+function openFilters(scrollTo) {
+  renderFilterSheet(); $("#filters").showModal();
+  if (scrollTo) $("#" + scrollTo).scrollIntoView({ block: "center" });
+}
+$("#open-filters").onclick = () => openFilters();
+$("#filters").addEventListener("click", e => {
+  const b = e.target.closest("button");
+  if (!b || !$("#filters").contains(b)) return;
+  const d = b.dataset;
+  if (d.s) F.sort = d.s;
+  else if (b.parentNode.id === "f-stock") F.stock = d.v;
+  else if (d.m !== undefined) F.mat = d.m;
+  else if (d.t) F.tags = toggleIn(F.tags, d.t);
+  else if (d.c) F.colors = toggleIn(F.colors, d.c);
+  else if (d.b) F.brands = toggleIn(F.brands, d.b);
+  else if (d.w) F.w = toggleIn(F.w, d.w);
+  else return;
+  fChanged();
+});
+$("#f-brand-q").addEventListener("input", renderFilterSheet);
+[["#f-ppk-min", "ppkMin"], ["#f-ppk-max", "ppkMax"], ["#f-p-min", "pMin"], ["#f-p-max", "pMax"]].forEach(([s, k]) =>
+  $(s).addEventListener("change", e => { F[k] = e.target.value; fChanged(); }));
+$("#f-shop").onchange = e => { F.shop = e.target.value; fChanged(); };
+[["#f-group", "group"], ["#f-sale", "sale"], ["#f-fav", "fav"], ["#f-hot", "hot"]].forEach(([s, k]) =>
+  $(s).onchange = e => { F[k] = e.target.checked; fChanged(); });
+$("#f-apply").onclick = () => $("#filters").close();
+$("#f-reset").onclick = () => { Object.assign(F, F0()); $("#f-brand-q").value = ""; fChanged(); };
+
+const stockOk = i => F.stock === "all" || i.stock === "in" || (F.stock === "avail" && i.stock === "order");
 function filtered() {
   const words = F.q.toLowerCase().split(/\s+/).filter(Boolean);
-  const wOk = w => !F.weight || (w && (F.weight === "lt1" ? w < 0.95 : F.weight === "1" ? w >= 0.95 && w <= 1.05 : w > 1.05));
-  const xs = DATA.items.filter(i =>
-    (!F.mat || i.material === F.mat) && (!F.brand || i.brand === F.brand) && (!F.shop || i.shop === F.shop) &&
-    (!F.stock || i.stock === "in") && (!F.fav || favs.has(i.id)) && (F.hot || i.src !== "hotline") && wOk(i.weight) &&
-    words.every(w => (i.title + " " + (i.color || "") + " " + i.shop + " " + (i.material || "") + " " + (i.brand || "")).toLowerCase().includes(w)));
+  const wfn = F.w.map(k => WEIGHTS.find(x => x[0] === k)?.[2]).filter(Boolean);
+  const lim = (v, lo, hi) => (lo === "" || (v != null && v >= +lo)) && (hi === "" || (v != null && v <= +hi));
+  return DATA.items.filter(i =>
+    (!F.mat || i.material === F.mat) && stockOk(i) && (F.hot || i.src !== "hotline") &&
+    (!F.tags.length || F.tags.every(t => (i.tags || []).includes(t))) &&
+    (!F.colors.length || F.colors.includes(i.color)) && (!F.brands.length || F.brands.includes(i.brand)) &&
+    (!F.shop || i.shop === F.shop) && (!wfn.length || (i.weight && wfn.some(fn => fn(i.weight)))) &&
+    lim(i.ppk, F.ppkMin, F.ppkMax) && lim(i.price, F.pMin, F.pMax) &&
+    (!F.sale || disc(i) > 0) && (!F.fav || favs.has(i.id)) &&
+    words.every(w => (i.title + " " + (i.color || "") + " " + i.shop + " " + (i.seller || "") + " " + (i.material || "") + " " + (i.brand || "")).toLowerCase().includes(w)));
+}
+// строки списка: одинаковые товары разных магазинов склеены, ведущий — самый дешёвый
+function rows() {
+  const xs = filtered(), out = [], at = new Map();
+  for (const i of xs) {
+    if (F.group && i.group) {
+      const r = at.get(i.group);
+      if (r) { r.items.push(i); continue; }
+      at.set(i.group, out[out.push({ items: [i] }) - 1]);
+    } else out.push({ items: [i] });
+  }
   const inf = v => v ?? Infinity;
-  if (F.sort === "ppk") xs.sort((a, b) => inf(a.ppk) - inf(b.ppk) || inf(a.price) - inf(b.price));
-  else if (F.sort === "price") xs.sort((a, b) => inf(a.price) - inf(b.price));
-  else xs.sort((a, b) => a.title.localeCompare(b.title, "uk"));
-  return xs;
+  for (const r of out) {
+    r.items.sort((a, b) => inf(a.ppk) - inf(b.ppk) || inf(a.price) - inf(b.price));
+    r.lead = r.items[0];
+  }
+  const by = {
+    ppk: (a, b) => inf(a.lead.ppk) - inf(b.lead.ppk) || inf(a.lead.price) - inf(b.lead.price),
+    ppk_d: (a, b) => (b.lead.ppk ?? -1) - (a.lead.ppk ?? -1),
+    price: (a, b) => inf(a.lead.price) - inf(b.lead.price),
+    disc: (a, b) => Math.max(...b.items.map(disc)) - Math.max(...a.items.map(disc)) || inf(a.lead.ppk) - inf(b.lead.ppk),
+    new: (a, b) => (b.items.some(i => i.new) - a.items.some(i => i.new)) || inf(a.lead.ppk) - inf(b.lead.ppk),
+    name: (a, b) => a.lead.title.localeCompare(b.lead.title, "uk"),
+  };
+  return out.sort(by[F.sort] || by.ppk);
 }
 
 /* ---------- список ---------- */
-function card(i) {
-  const hot = i.src === "hotline";
-  const price = i.price == null ? "—" : (i.price_max && i.price_max !== i.price ? "від " : "") + num(i.price) + " ₴";
-  const isBest = i.stock === "in" && i.ppk && !hot && BEST.get(i.material) === i.ppk;
+function badges(r) {
+  const i = r.lead, b = [];
+  const d = Math.max(...r.items.map(disc));
+  if (i.stock === "in" && i.ppk && i.src !== "hotline" && BEST.get(i.material) === i.ppk) b.push(`<span class="tag best">найдешевше</span>`);
+  if (d > 0) b.push(`<span class="tag sale">−${d}%</span>`);
+  if (r.items.some(x => x.drop) && !sale(i)) b.push(`<span class="tag drop">↓ за 30 днів</span>`);
+  if (r.items.some(x => x.new)) b.push(`<span class="tag new">новинка</span>`);
+  if (!b.length && deal(i) >= 15) b.push(`<span class="tag deal">−${deal(i)}% до медіани</span>`);
+  if (r.items.some(x => favs.has(x.id))) b.push(`<span class="tag fav">★</span>`);
+  return b.join("");
+}
+function card(r) {
+  const i = r.lead, hot = i.src === "hotline", many = r.items.length > 1;
+  const shops = new Set(r.items.map(x => x.shop + (x.seller || ""))).size;
+  const from = many || (i.price_max && i.price_max !== i.price);
+  const tg = (i.tags || []).filter(t => t !== "cf" || !i.material.endsWith("CF")).slice(0, 3);
   return `<li class="item" data-id="${esc(i.id)}">
-    ${swatch(i)}
+    ${photo(i)}
     <div class="t">${esc(i.title)}</div>
-    <div class="p"><b>${price}</b>${i.ppk ? `<span>${num(i.ppk)} ₴/кг</span>` : `<span class="na">вага ?</span>`}</div>
+    <div class="p">${i.price_old && !many ? `<s>${num(i.price_old)} ₴</s>` : ""}<b>${i.price == null ? "—" : (from ? "від " : "") + num(i.price) + " ₴"}</b>${i.ppk ? `<span>${num(i.ppk)} ₴/кг</span>` : `<span class="na">вага ?</span>`}</div>
     <div class="meta">
-      <span class="shop">${shopName(i)}</span>
+      <span class="mat-badge">${matDot(i.material)}${esc(MAT_NAME(i.material))}</span>
+      ${i.brand && !NOBRAND.test(i.brand) && !i.title.toLowerCase().includes(i.brand.toLowerCase()) ? `<span class="br-badge">${esc(i.brand)}</span>` : ""}
+      ${tg.map(t => `<span class="sub-badge">${esc(TAG_NAME[t])}</span>`).join("")}
+      ${i.weight ? `<span>${i.weight_est ? "≈" : ""}${num(i.weight, 2)} кг</span>` : ""}
+    </div>
+    <div class="meta">
+      <span class="shop">${many ? `<b class="nshops">${shops} ${plural(shops, "магазин", "магазини", "магазинів")}</b>` : hot ? `Hotline · ${i.offers} пропоз.` : shopName(i)}</span>
       <span class="st st-${i.stock || "unknown"}">${STOCK[i.stock] || STOCK.unknown}</span>
-      ${i.weight ? `<span${i.weight_est ? ' title="вага не вказана, оцінка"' : ""}>${i.weight_est ? "≈" : ""}${num(i.weight, 2)} кг</span>` : ""}
-      ${isBest ? `<span class="tag best">найдешевше</span>` : deal(i) >= 10 ? `<span class="tag deal">−${deal(i)}% до медіани</span>` : ""}
-      ${favs.has(i.id) ? `<span class="tag fav">★</span>` : ""}
+      ${badges(r)}
     </div>
   </li>`;
 }
+let ROWS = [];
 function render(reset = true) {
   if (reset) shown = PAGE;
-  const xs = filtered();
-  $("#count").textContent = `Знайдено ${num(xs.length)}`;
-  $("#list").innerHTML = xs.length ? xs.slice(0, shown).map(card).join("") :
+  ROWS = rows();
+  const n = ROWS.reduce((a, r) => a + r.items.length, 0);
+  $("#count").textContent = ROWS.length === n ? `Знайдено ${num(n)}` : `${num(ROWS.length)} товарів · ${num(n)} пропозицій`;
+  $("#list").innerHTML = ROWS.length ? ROWS.slice(0, shown).map(card).join("") :
     `<li class="empty">Нічого не знайдено.<br>Спробуй прибрати фільтри або змінити пошук.</li>`;
-  $("#more").hidden = xs.length <= shown;
+  $("#more").hidden = ROWS.length <= shown;
 }
 $("#more").onclick = () => { shown += PAGE; render(false); };
 $("#list").addEventListener("click", e => { const li = e.target.closest("[data-id]"); if (li) openItem(li.dataset.id); });
-
-/* ---------- найкраще ---------- */
-let bestMode = "all";
-function renderBest() {
-  const best = new Map();
-  for (const i of DATA.items) {
-    if (i.stock !== "in" || !i.ppk || !i.material || i.material === "Other") continue;
-    if (bestMode === "shops" && i.src === "hotline") continue;
-    const b = best.get(i.material);
-    if (!b || i.ppk < b.ppk) best.set(i.material, i);
-  }
-  const order = ["PLA", "PLA+", "PETG", "ABS", "ASA", "TPU"];
-  const rows = [...best.values()].sort((a, b) => {
-    const x = order.indexOf(a.material), y = order.indexOf(b.material);
-    return (x < 0 ? 99 : x) - (y < 0 ? 99 : y) || a.material.localeCompare(b.material);
-  });
-  $("#best").innerHTML = rows.map(i => `<div class="best-card" data-id="${esc(i.id)}">
-    <div class="mat">${matDot(i.material)}${esc(i.material)}</div>
-    <div class="big">${num(i.ppk)} <small>₴/кг</small></div>
-    <div class="name">${esc(i.title)}</div>
-    <div class="where">${i.src === "hotline" ? "Hotline · мін. ціна" : shopName(i)} · ${num(i.price)} ₴</div>
-  </div>`).join("") || `<div class="empty">Немає даних</div>`;
-}
-$$("#best-mode button").forEach(b => b.onclick = () => {
-  bestMode = b.dataset.m; $$("#best-mode button").forEach(x => x.classList.toggle("on", x === b)); renderBest();
-});
-$("#best").addEventListener("click", e => { const c = e.target.closest("[data-id]"); if (c) openItem(c.dataset.id); });
 
 /* ---------- карточка товара ---------- */
 async function openItem(id) {
   const i = byId.get(id);
   if (!i) return;
   const hot = i.src === "hotline";
-  const props = [i.material && MAT_NAME(i.material), i.brand, i.color, i.weight && (i.weight_est ? "≈" : "") + num(i.weight, 2) + " кг" + (i.weight_est ? " (оцінка)" : "")].filter(Boolean);
+  const offers = (i.group ? GROUPS.get(i.group) : [i]).slice().sort((a, b) => (a.stock !== "in") - (b.stock !== "in") || (a.ppk ?? 1e9) - (b.ppk ?? 1e9));
+  const props = [i.material && MAT_NAME(i.material), i.brand, i.color, i.weight && (i.weight_est ? "≈" : "") + num(i.weight, 2) + " кг" + (i.weight_est ? " (оцінка)" : ""),
+    ...(i.tags || []).map(t => TAG_NAME[t])].filter(Boolean);
   $("#sheet-body").innerHTML = `
-    <div class="d-hero">${swatch(i)}<div><h2>${esc(i.title)}</h2>
+    <div class="d-hero">${photo(i, "ph hero")}<div><h2>${esc(i.title)}</h2>
       <div class="sub">${hot ? `Hotline · ${i.offers} пропозицій` : shopName(i)} · <span class="st st-${i.stock}">${STOCK[i.stock] || ""}</span></div></div></div>
     <div class="d-stats">
-      <div class="d-stat"><span>${i.price_max && i.price_max !== i.price ? "Ціна від" : "Ціна"}</span><b>${num(i.price)} ₴</b></div>
+      <div class="d-stat"><span>${i.price_max && i.price_max !== i.price ? "Ціна від" : "Ціна"}</span><b>${num(i.price)} ₴</b>${i.price_old ? `<s>${num(i.price_old)} ₴</s>` : ""}</div>
       <div class="d-stat"><span>За кг</span><b>${i.ppk ? num(i.ppk) + " ₴" : "—"}</b></div>
       <div class="d-stat"><span>${hot ? "Ціна до" : "За грам"}</span><b>${hot ? num(i.price_max) + " ₴" : i.ppk ? num(i.ppk / 1000, 2) + " ₴" : "—"}</b></div>
     </div>
     <div class="d-props">${props.map(p => `<span>${esc(p)}</span>`).join("")}</div>
+    ${offers.length > 1 ? `<h3 class="sec">Де купити · ${offers.length} ${plural(offers.length, "пропозиція", "пропозиції", "пропозицій")}</h3>
+      <div class="offers">${offers.map(o => `<a class="offer ${o.id === i.id ? "cur" : ""}" href="${esc(o.url)}" target="_blank" rel="noopener">
+        <span class="o-s"><b>${shopName(o)}</b><small class="st st-${o.stock}">${STOCK[o.stock] || ""}</small></span>
+        <span class="o-p"><b>${num(o.price)} ₴</b><small>${o.ppk ? num(o.ppk) + " ₴/кг" : ""}</small></span><span class="o-go">↗</span></a>`).join("")}</div>` : ""}
     ${gauge(i)}
     <div class="d-actions">
       <a class="btn" href="${esc(i.url)}" target="_blank" rel="noopener">${hot ? "Усі магазини на Hotline ↗" : "Відкрити в магазині ↗"}</a>
@@ -269,7 +411,8 @@ async function openItem(id) {
     <div class="chart" id="chart"><div class="empty-c">Завантаження…</div></div>
     ${alts(i)}`;
   const dlg = $("#sheet");
-  dlg.showModal();
+  if (!dlg.open) dlg.showModal();
+  $("#sheet-body").scrollTop = 0; dlg.scrollTop = 0;
   $("#fav").onclick = e => {
     favs.has(i.id) ? favs.delete(i.id) : favs.add(i.id);
     store.set("favs", [...favs]);
@@ -297,14 +440,16 @@ function gauge(i) {
     <div class="g-scale"><span>${num(st.min)} ₴</span><span>медіана ${num(st.med)} ₴</span><span>${num(st.p90)} ₴+</span></div>
   </div>`;
 }
-/* дешевле за кг: тот же материал и цвет, в наличии */
+/* дешевле за кг: тот же материал и цвет, в наличии, не та же группа */
 function alts(i) {
   if (!i.ppk || !i.material || i.material === "Other") return "";
-  const xs = DATA.items.filter(x => x.id !== i.id && x.material === i.material && x.stock === "in" && x.ppk && x.ppk < i.ppk &&
-    x.src !== "hotline" && (!i.color || x.color === i.color)).sort((a, b) => a.ppk - b.ppk).slice(0, 5);
+  const seen = new Set([i.group || i.id]);
+  const xs = DATA.items.filter(x => x.material === i.material && x.stock === "in" && x.ppk && x.ppk < i.ppk &&
+    x.src !== "hotline" && (!i.color || x.color === i.color)).sort((a, b) => a.ppk - b.ppk)
+    .filter(x => { const k = x.group || x.id; if (seen.has(k)) return false; seen.add(k); return true; }).slice(0, 5);
   if (!xs.length) return "";
   return `<h3 class="sec">Дешевше за кг${i.color ? ` · ${esc(i.color.toLowerCase())}` : ""}</h3>
-    <div class="alts">${xs.map(x => `<button class="alt" data-id="${esc(x.id)}">${swatch(x)}
+    <div class="alts">${xs.map(x => `<button class="alt" data-id="${esc(x.id)}">${photo(x, "ph sm")}
       <span class="a-t"><span>${esc(x.title)}</span><small>${shopName(x)}</small></span>
       <span class="a-p"><b>${num(x.ppk)} ₴/кг</b><small>−${Math.round((1 - x.ppk / i.ppk) * 100)}%</small></span></button>`).join("")}</div>`;
 }
@@ -414,12 +559,14 @@ function initSettings() {
 }
 
 /* ---------- навигация ---------- */
-const TITLES = { list: "Філамент", best: "Найкраще", calc: "Калькулятор", set: "Налаштування" };
+const TITLES = { home: "Філамент UA", list: "Каталог", calc: "Калькулятор", set: "Налаштування" };
 function go(v) {
+  if (!TITLES[v]) v = "home";
   $$(".view").forEach(s => s.classList.toggle("active", s.id === "v-" + v));
   $$(".tabs button").forEach(b => b.classList.toggle("on", b.dataset.v === v));
   $("#title").textContent = TITLES[v];
   $("#search-row").hidden = $("#mats").hidden = v !== "list";
+  $("#stats").hidden = v === "home";
   store.set("tab", v);
   scrollTo(0, 0);
 }
@@ -428,6 +575,6 @@ $$(".tabs button").forEach(b => b.onclick = () => go(b.dataset.v));
 const cs = store.get("calc", null);
 if (cs) { $("#c-g").value = cs.g; $("#c-ppk").value = cs.ppk; $("#c-waste").value = cs.waste; $("#k-p").value = cs.p; $("#k-w").value = cs.w; }
 $$("#v-calc .panel:not(:last-child) input").forEach(el => el.addEventListener("input", calc));
-calc(); renderCmp(); initSettings(); go(store.get("tab", "list")); load();
+calc(); renderCmp(); initSettings(); go(store.get("tab", "home")); load();
 
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => { });

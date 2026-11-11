@@ -4,7 +4,7 @@ import re
 import urllib.error
 import urllib.parse
 
-from common import get
+from common import get, short_key
 from sources import ldjson
 from sources.ldjson import AVAIL
 
@@ -49,9 +49,9 @@ def parse(shop, html, base=""):
         if key:
             key = key.group(1)
         elif own:
-            key = url.rstrip("/").rsplit("/", 1)[-1][:80]
+            key = short_key(url.rstrip("/").rsplit("/", 1)[-1])
         else:
-            key = re.sub(r"\W+", "-", d["name"].lower())[:80]
+            key = short_key(re.sub(r"\W+", "-", d["name"].lower()))
         out.append({
             "id": f"{shop['id']}:{key}",
             "shop": shop["name"],

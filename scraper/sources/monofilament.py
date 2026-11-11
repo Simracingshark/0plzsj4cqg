@@ -26,6 +26,8 @@ def parse(shop, page):
             variant = "Ø{},{}мм / {},{}кг".format(*slug.groups())
         # цена со скидкой: <span class="price-new">
         new = re.search(r'price-new[^>]*>([^<]*)', cost.group(1))
+        old = re.search(r'price-old[^>]*>([^<]*)', cost.group(1))
+        img = re.search(r'<img src="([^"]+)"', c)
         out.append({
             "id": f"{shop['id']}:{url.rstrip('/').rsplit('/', 1)[-1]}",
             "shop": shop["name"],
@@ -34,6 +36,8 @@ def parse(shop, page):
             "price": price(new.group(1) if new else text(cost.group(1))),
             "stock": "out" if pill and "out-of-stock" in pill.group(1) else "in",
             "url": url,
+            "image": img.group(1) if img else None,
+            "price_old": price(old.group(1)) if old else None,
         })
     return out
 

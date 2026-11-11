@@ -11,7 +11,7 @@ import re
 import urllib.error
 import urllib.parse
 
-from common import get, price, text, weight_kg
+from common import get, price, short_key, text, weight_kg
 
 DROP = re.compile(r'<(\w+)[^>]*class="[^"]*(?:old|wholesale|special-old|price-old|tier-discount)[^"]*"[^>]*>.*?</\1>', re.S | re.I)
 HIDDEN = re.compile(r'<(\w+)[^>]*class="[^"]*(?:hidden|d-none)[^"]*"[^>]*>.*?</\1>', re.S | re.I)
@@ -61,7 +61,7 @@ def parse(shop, html, base):
         url = urllib.parse.urljoin(base, href)
         img = re.search(r'<img[^>]+(?:data-src|src)="([^"]+\.(?:jpe?g|png|webp)[^"]*)"', c)
         out.append({
-            "id": f"{shop['id']}:{urllib.parse.urlparse(url).path.strip('/').rsplit('/', 1)[-1][:80]}",
+            "id": f"{shop['id']}:{short_key(urllib.parse.urlparse(url).path.strip('/').rsplit('/', 1)[-1])}",
             "shop": shop["name"],
             "title": title,
             "weight": weight_kg(title) or weight_kg(t[:400]),
@@ -89,9 +89,18 @@ def scrape(shop):
                 if n > 1 and e.code == 404:  # страницы закончились
                     break
                 raise
-            got = [o for o in parse(shop, html, u) if o["id"] not in seen]
-            for o in got:
+            got = []
+            for o in parse(shop, html, u):
+                sig = (o["title"], o["price"])
+                if sig in seen:  # тот же товар второй раз (в другой категории или на странице дважды)
+                    continue
+                seen.add(sig)
+                k, n = o["id"], 2
+                while o["id"] in seen:  # один адрес, разные варианты (вес) — разные id
+                    o["id"] = f"{k}~{n}"
+                    n += 1
                 seen.add(o["id"])
+                got.append(o)
             out += got
             if not got:
                 break

@@ -11,7 +11,7 @@ import traceback
 from datetime import datetime, timezone
 
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
-from common import diameter, is_filament, material, normalize  # noqa: E402
+from common import diameter, group_key, is_filament, material, normalize, tags  # noqa: E402
 from sources import (cards, hotline, ld_listing, monofilament, opencart, prom_search,  # noqa: E402
                      prom_seller, shopify, woocommerce)
 
@@ -21,7 +21,8 @@ TYPES = {"hotline": hotline, "opencart": opencart, "prom_seller": prom_seller, "
          "ld_listing": ld_listing, "woocommerce": woocommerce, "shopify": shopify,
          "monofilament": monofilament, "prom_search": prom_search}
 KEEP = ("id", "shop", "title", "brand", "material", "color", "weight", "price",
-        "price_max", "offers", "stock", "ppk", "url", "weight_est", "seller")
+        "price_max", "offers", "stock", "ppk", "url", "weight_est", "seller",
+        "image", "price_old", "tags", "group", "new", "drop")
 
 
 def load(name, default):
@@ -43,6 +44,13 @@ def clean(o):
 FILAMENT_WORD = re.compile(r"філамент|филамент|filament|пластик|plastic|нитк|пруток", re.I)
 
 
+def refresh(i):
+    """Запись из прошлого запуска: пересчитать подтипы и ключ склейки по новым правилам."""
+    i["tags"] = tags(i["title"], i.get("material") or "Other") or None
+    i["group"] = group_key(i) if i.get("material") else None
+    return i
+
+
 def keep(o):
     if o.get("kind") and "філамент" not in o["kind"].lower():
         return False
@@ -62,7 +70,7 @@ def main(only):
         fresh = last.get("ok") and last.get("at") and \
             hours_since(last["at"]) < shop.get("every_h", 0)
         if (only and shop["id"] not in only) or (not only and fresh):
-            items += [i for i in prev["items"] if i.get("src") == shop["id"]]
+            items += [refresh(i) for i in prev["items"] if i.get("src") == shop["id"]]
             status += [s for s in prev["shops"] if s["id"] == shop["id"]]
             continue
         t0 = time.time()
@@ -76,7 +84,7 @@ def main(only):
             print(f"{shop['id']}: {len(got)} за {time.time() - t0:.0f} с")
         except Exception as e:  # один сломанный магазин не валит остальные
             traceback.print_exc()
-            old = [i for i in prev["items"] if i.get("src") == shop["id"]]
+            old = [refresh(i) for i in prev["items"] if i.get("src") == shop["id"]]
             items += old
             status.append({"id": shop["id"], "name": shop["name"], "ok": False,
                            "count": len(old), "at": last.get("at"), "error": str(e)[:200]})
@@ -84,10 +92,28 @@ def main(only):
     # старые записи могли сохраниться с полями, которых уже нет в KEEP
     items = [{k: v for k, v in i.items() if k in KEEP or k == "src"} for i in items]
     DATA.mkdir(exist_ok=True)
+    annotate(items, update_history(items))
     (DATA / "offers.json").write_text(json.dumps(
         {"updated": now(), "shops": status, "items": items},
         ensure_ascii=False, separators=(",", ":")), "utf-8")
-    update_history(items)
+
+
+def annotate(items, hist):
+    """Из истории: new — товар появился в последние 14 дней (но не в самый первый сбор),
+    drop — на сколько % цена ниже максимума за 30 дней."""
+    first = min((h[0][0] for h in hist.values() if h), default=None)
+    today = datetime.now(timezone.utc).date()
+    for i in items:
+        i.pop("new", None), i.pop("drop", None)
+        h = hist.get(i["id"])
+        if not h or i.get("price") is None:
+            continue
+        start = datetime.fromisoformat(h[0][0]).date()
+        if h[0][0] != first and (today - start).days <= 14:
+            i["new"] = 1
+        recent = [p for d, p, _ in h if (today - datetime.fromisoformat(d).date()).days <= 30]
+        if recent and max(recent) > i["price"] * 1.03:
+            i["drop"] = round((1 - i["price"] / max(recent)) * 100)
 
 
 def update_history(items):
@@ -108,6 +134,7 @@ def update_history(items):
             h.append(pt)
     (DATA / "history.json").write_text(json.dumps(
         hist, ensure_ascii=False, separators=(",", ":")), "utf-8")
+    return hist
 
 
 def hours_since(iso):

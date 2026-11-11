@@ -44,7 +44,8 @@ tools/make_icons.py       генерит icon-192/512.png без библиот�
 
 ## Формат данных
 `offers.json`: `{updated, shops:[{id,name,ok,count,at,error?}], items:[...]}`.
-Поля товара: `id` (`источник:ключ`), `src`, `shop`, `title`, `brand`, `material`, `color`, `weight` (кг), `price` (₴, мин.), `price_max` (только Hotline), `offers` (только Hotline), `stock` (`in`/`order`/`out`/`unknown`), `ppk` (₴/кг), `url`, `weight_est` (1 = вес не указан, для Bambu Lab взят 1 кг; в UI «≈»). Картинки не храним (размер данных ~2 МБ).
+Поля товара: `id` (`источник:ключ`), `src`, `shop`, `title`, `brand`, `material`, `color`, `weight` (кг), `price` (₴, мин.), `price_max` (только Hotline), `offers` (только Hotline), `stock` (`in`/`order`/`out`/`unknown`), `ppk` (₴/кг), `url`, `weight_est` (1 = вес не указан, для Bambu Lab взят 1 кг; в UI «≈»), `seller` (продавец Prom), `image` (адрес превью у магазина, сами картинки не храним), `price_old` (зачёркнутая цена, где магазин её отдаёт: Woo, Shopify, Prom, MonoFilament, 3DDevice), `tags` (подтипы: matte, silk, hs, cf, gf, glow, marble, transp, multi, metal, refill), `group` (ключ склейки одинаковых товаров: бренд|материал|вес|значимые слова названия, только точное совпадение), `new` (появился ≤14 дней назад, не в первый сбор), `drop` (% ниже максимума за 30 дней).
+Ключи id: длинные слаги через `common.short_key` (обрезка + crc32), в cards один адрес с разными вариантами получает `~2`, `~3`.
 `history.json`: `{id: [[YYYY-MM-DD, цена, наличие 1/2/0], ...]}`; новая точка только при изменении цены или наличия.
 Если источник упал, остаются его товары из прошлого запуска, в `shops[]` `ok:false`.
 

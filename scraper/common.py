@@ -1,6 +1,7 @@
 """HTTP и нормализация названий филамента: материал, вес, бренд, цвет, диаметр."""
 import html
 import re
+import zlib
 import time
 import urllib.error
 import urllib.request
@@ -87,13 +88,21 @@ def material(name):
     return "Other"
 
 
+def short_key(s, n=80):
+    """Ключ из адреса/названия: длинные режем, но добавляем crc всего, чтобы не склеить разные товары."""
+    if len(s) <= n:
+        return s
+    return f"{s[:n - 9]}-{zlib.crc32(s.encode()):08x}"
+
+
 def weight_kg(name):
     """Вес катушки в кг из названия. None если не найден."""
     n = name.replace(",", ".")
-    m = re.search(r"(\d+(?:\.\d+)?)\s*(?:кг|kg|кило)", n, re.I)
-    if m:
-        v = float(m.group(1))
-        return v if 0.1 <= v <= 50 else None
+    # берём последнее упоминание: «(0,50 4,00 кг), 1,00 кг» — диапазон фасовок в начале, выбранная в конце
+    ms = re.findall(r"(\d+(?:\.\d+)?)\s*(?:кг|kg|кило)", n, re.I)
+    if ms:
+        v = float(ms[-1])
+        return v if 0.1 <= v <= 10 else None  # 21 кг на катушке — опечатка продавца
     m = re.search(r"(\d{2,5})\s*(?:г|гр|g|gr)\b", n, re.I)
     if m:
         v = float(m.group(1)) / 1000
@@ -180,4 +189,48 @@ def normalize(o):
     o.setdefault("diameter", diameter(n))
     p, w = o.get("price"), o.get("weight")
     o["ppk"] = round(p / w) if p and w else None
+    if o.get("price_old") and (not p or o["price_old"] <= p * 1.01):
+        o["price_old"] = None  # «старая» цена не выше текущей — не скидка
+    o["tags"] = tags(n, o["material"]) or None
+    o["group"] = group_key(o)
     return o
+
+
+# подтипы филамента: код -> regex по названию
+TAGS = [
+    ("matte", r"matte|матов"), ("silk", r"silk|шовк|шелк"),
+    ("hs", r"high[\s-]*speed|hyper|\bHS\b|rapid|швидкісн|скоростн"),
+    ("cf", r"\bCF\d*\b|carbon|карбон|вуглеволок"), ("gf", r"\bGF\d*\b|склонапов|стеклонап"),
+    ("glow", r"glow|світиться|светится|люмінес|люминес|фосфор"),
+    ("marble", r"marble|мармур|мрамор|granite|граніт"),
+    ("transp", r"translucent|transparent|прозор|\bclear\b"),
+    ("multi", r"dual|tri-?colou?r|rainbow|gradient|multicolou?r|двоколір|триколір|градієнт|перехідн|веселк"),
+    ("metal", r"metallic|\bmetal\b|металік|металлик|перламутр"),
+    ("refill", r"refill|рефіл|рефил|без котушки|без катушки"),
+]
+
+
+def tags(name, mat):
+    t = [k for k, rx in TAGS if re.search(rx, name, re.I)]
+    if mat.endswith("-CF") and "cf" not in t:
+        t.append("cf")
+    return t
+
+
+# слова, которые магазины добавляют к названию одного и того же товара по-разному
+_STOP = set("""пластик пластику філамент філаменту филамент нитка нить для до 3d 3д друку печати печаті
+принтера принтеру принтерів принтеров printer filament plastic 3d-принтера 3д-принтера мм mm кг kg г g
+на котушці катушке spool with з і и та the of оригінальний оригинальный""".split())
+
+
+def group_key(o):
+    """Ключ склейки: бренд, материал, вес и набор значимых слов названия.
+    Склеиваем только точное совпадение, чтобы не смешать разные цвета."""
+    b, w = o.get("brand"), o.get("weight")
+    if not b or not w or o["material"] == "Other":
+        return None
+    words = re.findall(r"[a-zа-яіїєґ]+", o["title"].lower().replace(b.lower(), " "))
+    sig = sorted({x for x in words if x not in _STOP and len(x) > 1})
+    if not sig:
+        return None
+    return "|".join([b.lower(), o["material"], f"{w:g}"] + sig)[:120]

@@ -7,7 +7,12 @@ from common import get, price, text
 
 def scrape(shop):
     out, seen = [], set()
-    url = shop["url"]
+    for url in shop.get("urls") or [shop["url"]]:
+        scrape_url(shop, url, out, seen)
+    return out
+
+
+def scrape_url(shop, url, out, seen):
     for page in range(1, 60):
         html = get(url if page == 1 else f"{url}?page={page}")
         cards = html.split('<div class="product-layout')[1:]
@@ -23,6 +28,7 @@ def scrape(shop):
             b = re.search(r'Brand:</span>\s*<span>\s*<a[^>]*>([^<]+)</a>', c) or \
                 re.search(r'Бренд:</span>\s*<span>\s*<a[^>]*>([^<]+)</a>', c)
             img = re.search(r'<img src="([^"]+)"', c)
+            old = re.search(r'price-old">([^<]*)<', c)
             slug = m.group(1).rstrip("/").rsplit("/", 1)[-1]
             out.append({
                 "id": f"{shop['id']}:{slug}",
@@ -34,8 +40,8 @@ def scrape(shop):
                 "stock": "out" if "out-of-stock" in cls else ("in" if prices else "unknown"),
                 "url": m.group(1),
                 "image": img.group(1) if img else None,
+                "price_old": price(old.group(1)) if old else None,
             })
             got += 1
         if not got or f"page={page + 1}" not in html:
             break
-    return out

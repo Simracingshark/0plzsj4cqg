@@ -22,7 +22,8 @@
   {"id": "sunlu3d", "name": "SUNLU3D", "type": "cards", "stock": "class",
    "urls": ["https://sunlu3d.com.ua/kupyty-filament/"], "card": "re:<div class=\"card[\" ]"},
   {"id": "3ddevice", "name": "3DDevice", "type": "opencart",
-   "url": "https://3ddevice.com.ua/en/shop/3d-plastics/"},
+   "url": "https://3ddevice.com.ua/en/shop/3d-plastics/",
+   "urls": ["https://3ddevice.com.ua/en/shop/3d-plastics/", "https://3ddevice.com.ua/en/plexiwire-en/"]},
 
   {"id": "3d4u", "name": "3D4U", "type": "ld_listing",
    "urls": ["https://3d4u.com.ua/uk/3d-materials/c6"], "page": "?page={n}"},
