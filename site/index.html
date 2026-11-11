@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Філамент UA</title>
+<meta name="theme-color" content="#16181d" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f6f5f2" media="(prefers-color-scheme: light)">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <h1 id="title">Ціни</h1>
+  <span id="updated" class="muted"></span>
+</header>
+
+<main>
+  <!-- Цены -->
+  <section id="v-list" class="view active">
+    <div class="filters">
+      <input id="q" type="search" placeholder="Пошук: PETG чорний, Plexiwire…" autocomplete="off">
+      <div class="row">
+        <select id="f-mat"><option value="">Усі матеріали</option></select>
+        <select id="f-brand"><option value="">Усі бренди</option></select>
+      </div>
+      <div class="row">
+        <select id="f-shop"><option value="">Усі джерела</option></select>
+        <select id="f-sort">
+          <option value="ppk">Дешевше за кг</option>
+          <option value="price">Дешевше за штуку</option>
+          <option value="name">За назвою</option>
+        </select>
+      </div>
+      <div class="chips">
+        <label class="chip"><input type="checkbox" id="f-stock" checked> В наявності</label>
+        <label class="chip"><input type="checkbox" id="f-fav"> ★ Обране</label>
+        <label class="chip"><input type="checkbox" id="f-hot" checked> Hotline</label>
+      </div>
+    </div>
+    <div id="count" class="muted small"></div>
+    <ul id="list" class="list"></ul>
+    <button id="more" class="btn ghost" hidden>Показати ще</button>
+  </section>
+
+  <!-- Лучшее за кг -->
+  <section id="v-best" class="view">
+    <p class="muted small">Найнижча ціна за кг для кожного матеріалу серед товарів у наявності. Натисни рядок, щоб відкрити товар.</p>
+    <div class="chips"><label class="chip"><input type="checkbox" id="b-hot" checked> Враховувати Hotline</label></div>
+    <table class="tbl" id="best"></table>
+  </section>
+
+  <!-- Калькуляторы -->
+  <section id="v-calc" class="view">
+    <details class="card" open>
+      <summary>Деталь за грамами</summary>
+      <div class="form">
+        <label>Вага деталі, г <input id="c-g" type="number" inputmode="decimal" value="50"></label>
+        <label>Ціна за кг, ₴ <input id="c-ppk" type="number" inputmode="decimal" value="700"></label>
+        <label>Запас на підтримки/брак, % <input id="c-waste" type="number" inputmode="decimal" value="10"></label>
+        <div class="out" id="c-out"></div>
+        <p class="muted small">Ціну за кг можна підставити з картки товару: кнопка «Порахувати деталь».</p>
+      </div>
+    </details>
+    <details class="card" open>
+      <summary>Ціна за кг</summary>
+      <div class="form">
+        <label>Ціна котушки, ₴ <input id="k-p" type="number" inputmode="decimal" value="650"></label>
+        <label>Вага пластику, кг <input id="k-w" type="number" inputmode="decimal" value="1" step="0.05"></label>
+        <div class="out" id="k-out"></div>
+      </div>
+    </details>
+    <details class="card" open>
+      <summary>Порівняння з доставкою</summary>
+      <p class="muted small">Кожен рядок — покупка в одному магазині. Доставка за замовчуванням береться з налаштувань.</p>
+      <table class="tbl cmp" id="cmp"></table>
+      <button class="btn ghost" id="cmp-add">+ Рядок</button>
+    </details>
+  </section>
+
+  <!-- Настройки -->
+  <section id="v-set" class="view">
+    <div class="card form">
+      <label>Моє місто (для доставки) <input id="s-city" type="text" placeholder="наприклад, Київ"></label>
+      <label>Доставка Новою Поштою за замовчуванням, ₴ <input id="s-del" type="number" inputmode="decimal"></label>
+      <label>Безкоштовна доставка від суми, ₴ (0 — немає) <input id="s-free" type="number" inputmode="decimal"></label>
+      <p class="muted small">Тариф НП залежить від ваги та маршруту. Перевір у їхньому калькуляторі й впиши своє типове значення.</p>
+    </div>
+    <h2>Джерела</h2>
+    <ul id="shops" class="list"></ul>
+  </section>
+</main>
+
+<nav class="tabs">
+  <button data-v="list" class="on">Ціни</button>
+  <button data-v="best">Найкраще</button>
+  <button data-v="calc">Калькулятори</button>
+  <button data-v="set">Налаштування</button>
+</nav>
+
+<dialog id="sheet"><div id="sheet-body"></div></dialog>
+
+<script src="app.js"></script>
+</body>
+</html>

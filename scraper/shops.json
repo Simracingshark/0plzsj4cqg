@@ -1,0 +1,7 @@
+[
+  {"id": "hotline", "name": "Hotline", "type": "hotline", "every_h": 11.5},
+  {"id": "3ddevice", "name": "3DDevice", "type": "opencart",
+   "url": "https://3ddevice.com.ua/en/shop/3d-plastics/"},
+  {"id": "plastfill", "name": "PlastFill (Prom)", "type": "prom_seller",
+   "url": "https://prom.ua/ua/c3804832-plastfill.html"}
+]
