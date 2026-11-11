@@ -4,104 +4,144 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Філамент UA</title>
-<meta name="theme-color" content="#16181d" media="(prefers-color-scheme: dark)">
-<meta name="theme-color" content="#f6f5f2" media="(prefers-color-scheme: light)">
+<meta name="description" content="Ціни та наявність пластику для 3D-друку в українських магазинах">
+<meta name="theme-color" content="#0e0f13" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f4f3f7" media="(prefers-color-scheme: light)">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon-192.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
+
 <header class="top">
-  <h1 id="title">Ціни</h1>
-  <span id="updated" class="muted"></span>
+  <div class="top-row">
+    <div>
+      <h1 id="title">Філамент</h1>
+      <p id="stats" class="stats">Завантаження…</p>
+    </div>
+    <button class="icon-btn" id="theme" aria-label="Тема">
+      <svg viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+    </button>
+  </div>
+  <div class="search-row" id="search-row">
+    <label class="search">
+      <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input id="q" type="search" placeholder="PETG чорний, Plexiwire, 3 кг…" autocomplete="off" enterkeyhint="search">
+    </label>
+    <button class="filter-btn" id="open-filters" aria-label="Фільтри">
+      <svg viewBox="0 0 24 24"><path d="M4 6h16M7 12h10M10 18h4"/></svg>
+      <span id="fcount" class="dot-count" hidden></span>
+    </button>
+  </div>
+  <div class="chips-scroll" id="mats"></div>
 </header>
 
 <main>
-  <!-- Цены -->
   <section id="v-list" class="view active">
-    <div class="filters">
-      <input id="q" type="search" placeholder="Пошук: PETG чорний, Plexiwire…" autocomplete="off">
-      <div class="row">
-        <select id="f-mat"><option value="">Усі матеріали</option></select>
-        <select id="f-brand"><option value="">Усі бренди</option></select>
-      </div>
-      <div class="row">
-        <select id="f-shop"><option value="">Усі джерела</option></select>
-        <select id="f-sort">
-          <option value="ppk">Дешевше за кг</option>
-          <option value="price">Дешевше за штуку</option>
-          <option value="name">За назвою</option>
-        </select>
-      </div>
-      <div class="chips">
-        <label class="chip"><input type="checkbox" id="f-stock" checked> В наявності</label>
-        <label class="chip"><input type="checkbox" id="f-fav"> ★ Обране</label>
-        <label class="chip"><input type="checkbox" id="f-hot" checked> Hotline</label>
-      </div>
+    <div class="list-head">
+      <span id="count" class="muted"></span>
+      <button class="link-btn" id="sort-btn"></button>
     </div>
-    <div id="count" class="muted small"></div>
     <ul id="list" class="list"></ul>
-    <button id="more" class="btn ghost" hidden>Показати ще</button>
+    <button id="more" class="btn soft wide" hidden>Показати ще</button>
   </section>
 
-  <!-- Лучшее за кг -->
   <section id="v-best" class="view">
-    <p class="muted small">Найнижча ціна за кг для кожного матеріалу серед товарів у наявності. Натисни рядок, щоб відкрити товар.</p>
-    <div class="chips"><label class="chip"><input type="checkbox" id="b-hot" checked> Враховувати Hotline</label></div>
-    <table class="tbl" id="best"></table>
-  </section>
-
-  <!-- Калькуляторы -->
-  <section id="v-calc" class="view">
-    <details class="card" open>
-      <summary>Деталь за грамами</summary>
-      <div class="form">
-        <label>Вага деталі, г <input id="c-g" type="number" inputmode="decimal" value="50"></label>
-        <label>Ціна за кг, ₴ <input id="c-ppk" type="number" inputmode="decimal" value="700"></label>
-        <label>Запас на підтримки/брак, % <input id="c-waste" type="number" inputmode="decimal" value="10"></label>
-        <div class="out" id="c-out"></div>
-        <p class="muted small">Ціну за кг можна підставити з картки товару: кнопка «Порахувати деталь».</p>
-      </div>
-    </details>
-    <details class="card" open>
-      <summary>Ціна за кг</summary>
-      <div class="form">
-        <label>Ціна котушки, ₴ <input id="k-p" type="number" inputmode="decimal" value="650"></label>
-        <label>Вага пластику, кг <input id="k-w" type="number" inputmode="decimal" value="1" step="0.05"></label>
-        <div class="out" id="k-out"></div>
-      </div>
-    </details>
-    <details class="card" open>
-      <summary>Порівняння з доставкою</summary>
-      <p class="muted small">Кожен рядок — покупка в одному магазині. Доставка за замовчуванням береться з налаштувань.</p>
-      <table class="tbl cmp" id="cmp"></table>
-      <button class="btn ghost" id="cmp-add">+ Рядок</button>
-    </details>
-  </section>
-
-  <!-- Настройки -->
-  <section id="v-set" class="view">
-    <div class="card form">
-      <label>Моє місто (для доставки) <input id="s-city" type="text" placeholder="наприклад, Київ"></label>
-      <label>Доставка Новою Поштою за замовчуванням, ₴ <input id="s-del" type="number" inputmode="decimal"></label>
-      <label>Безкоштовна доставка від суми, ₴ (0 — немає) <input id="s-free" type="number" inputmode="decimal"></label>
-      <p class="muted small">Тариф НП залежить від ваги та маршруту. Перевір у їхньому калькуляторі й впиши своє типове значення.</p>
+    <p class="lead">Найнижча ціна за кілограм для кожного матеріалу серед товарів у наявності.</p>
+    <div class="seg" id="best-mode">
+      <button data-m="all" class="on">Усі джерела</button>
+      <button data-m="shops">Тільки магазини</button>
     </div>
-    <h2>Джерела</h2>
-    <ul id="shops" class="list"></ul>
+    <div id="best" class="best-grid"></div>
+  </section>
+
+  <section id="v-calc" class="view">
+    <article class="panel">
+      <header><span class="ico">⚖️</span><h2>Деталь за грамами</h2></header>
+      <div class="grid2">
+        <label class="field"><span>Вага деталі</span><div class="inp"><input id="c-g" type="number" inputmode="decimal" value="50"><i>г</i></div></label>
+        <label class="field"><span>Ціна за кг</span><div class="inp"><input id="c-ppk" type="number" inputmode="decimal" value="700"><i>₴</i></div></label>
+      </div>
+      <label class="field"><span>Запас на підтримки й брак</span><div class="inp"><input id="c-waste" type="number" inputmode="decimal" value="10"><i>%</i></div></label>
+      <div class="result" id="c-out"></div>
+      <p class="hint">Ціну за кг можна підставити з картки товару кнопкою «Порахувати деталь».</p>
+    </article>
+
+    <article class="panel">
+      <header><span class="ico">🧮</span><h2>Ціна за кілограм</h2></header>
+      <div class="grid2">
+        <label class="field"><span>Ціна котушки</span><div class="inp"><input id="k-p" type="number" inputmode="decimal" value="650"><i>₴</i></div></label>
+        <label class="field"><span>Вага пластику</span><div class="inp"><input id="k-w" type="number" inputmode="decimal" value="1" step="0.05"><i>кг</i></div></label>
+      </div>
+      <div class="result" id="k-out"></div>
+    </article>
+
+    <article class="panel">
+      <header><span class="ico">🚚</span><h2>Порівняння з доставкою</h2></header>
+      <p class="hint">Кожна покупка — окремий рядок. Порожня доставка = значення з налаштувань.</p>
+      <div id="cmp" class="cmp"></div>
+      <button class="btn soft wide" id="cmp-add">+ Додати покупку</button>
+    </article>
+  </section>
+
+  <section id="v-set" class="view">
+    <article class="panel">
+      <header><span class="ico">📍</span><h2>Доставка</h2></header>
+      <label class="field"><span>Моє місто</span><div class="inp"><input id="s-city" type="text" placeholder="наприклад, Київ"></div></label>
+      <div class="grid2">
+        <label class="field"><span>Доставка НП за замовч.</span><div class="inp"><input id="s-del" type="number" inputmode="decimal"><i>₴</i></div></label>
+        <label class="field"><span>Безкоштовно від</span><div class="inp"><input id="s-free" type="number" inputmode="decimal" placeholder="0"><i>₴</i></div></label>
+      </div>
+      <p class="hint">Тариф Нової Пошти залежить від ваги й маршруту. Перевір у їхньому калькуляторі й впиши своє типове значення.</p>
+    </article>
+    <h3 class="sec">Джерела даних</h3>
+    <ul id="shops" class="shops"></ul>
   </section>
 </main>
 
 <nav class="tabs">
-  <button data-v="list" class="on">Ціни</button>
-  <button data-v="best">Найкраще</button>
-  <button data-v="calc">Калькулятори</button>
-  <button data-v="set">Налаштування</button>
+  <button data-v="list" class="on"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h10"/></svg><span>Ціни</span></button>
+  <button data-v="best"><svg viewBox="0 0 24 24"><path d="M12 3l2.6 5.6 6.1.7-4.5 4.2 1.2 6L12 16.6 6.6 19.5l1.2-6L3.3 9.3l6.1-.7z"/></svg><span>Найкраще</span></button>
+  <button data-v="calc"><svg viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="3"/><path d="M8 7h8M8 11h2M12 11h2M8 15h2M12 15h4"/></svg><span>Калькулятор</span></button>
+  <button data-v="set"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg><span>Налаштування</span></button>
 </nav>
 
-<dialog id="sheet"><div id="sheet-body"></div></dialog>
+<dialog id="sheet" class="sheet"><div class="handle"></div><div id="sheet-body"></div></dialog>
+
+<dialog id="filters" class="sheet">
+  <div class="handle"></div>
+  <div class="sheet-pad">
+    <div class="sheet-title"><h2>Фільтри</h2><button class="link-btn" id="f-reset">Скинути</button></div>
+    <h3 class="sec">Сортування</h3>
+    <div class="seg" id="f-sort">
+      <button data-s="ppk" class="on">₴ за кг</button>
+      <button data-s="price">₴ за штуку</button>
+      <button data-s="name">Назва</button>
+    </div>
+    <h3 class="sec">Показувати</h3>
+    <label class="toggle"><span>Тільки в наявності</span><input type="checkbox" id="f-stock" checked><i></i></label>
+    <label class="toggle"><span>★ Тільки обране</span><input type="checkbox" id="f-fav"><i></i></label>
+    <label class="toggle"><span>Зведення Hotline</span><input type="checkbox" id="f-hot" checked><i></i></label>
+    <h3 class="sec">Бренд</h3>
+    <select id="f-brand"><option value="">Усі бренди</option></select>
+    <h3 class="sec">Магазин</h3>
+    <select id="f-shop"><option value="">Усі магазини</option></select>
+    <h3 class="sec">Вага котушки</h3>
+    <div class="seg" id="f-weight">
+      <button data-w="" class="on">Будь-яка</button>
+      <button data-w="lt1">&lt; 1 кг</button>
+      <button data-w="1">≈ 1 кг</button>
+      <button data-w="gt1">&gt; 1 кг</button>
+    </div>
+    <button class="btn wide" id="f-apply">Показати</button>
+  </div>
+</dialog>
 
 <script src="app.js"></script>
 </body>

@@ -1,5 +1,5 @@
 // Оболочка приложения — из кэша; данные — сначала сеть, без сети последняя копия.
-const CACHE = "ft-v1";
+const CACHE = "ft-v3";
 const SHELL = ["./", "index.html", "style.css", "app.js", "manifest.webmanifest", "icon.svg", "icon-192.png"];
 
 self.addEventListener("install", e => {

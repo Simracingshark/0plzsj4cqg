@@ -49,11 +49,11 @@ MATERIALS = [
     ("PETG-CF", r"\bPETG[\s-]*CF\d*\b|\bPETG\b.*\b(?:carbon|карбон)"),
     ("PA-CF", r"\b(?:PA\d*|PPA|PAHT|PA6|PA12|nylon|нейлон)[\s-]*(?:CF|GF)\d*\b|\bPPS[\s-]*CF"),
     ("PCTG", r"\bPCTG\b"),
-    ("CoPET", r"\bCo-?PET\b|\bPETT\b"),
+    ("CoPET", r"\bCo-?PET\b|\bCoPE\b|\bPETT\b"),
     ("PETG", r"\bPETG\b|\bPET-G\b"),
     ("PET", r"\bPET\b"),
     ("PLA+", r"\bPLA\s*\+|\bPLA[\s-]*plus\b|\bPLA[\s-]*Pro\b"),
-    ("PLA", r"\bH?PLA\b"),
+    ("PLA", r"\bH?PLA\b|\bFiberSilk\b"),
     ("ABS", r"\bABS\b"),
     ("ASA", r"\bASA\b"),
     ("TPU", r"\bTPU\b|\bTPEE?\b|\bflex\b|\belastan\b|гнучк|флекс"),
@@ -67,11 +67,18 @@ MATERIALS = [
     ("Wood", r"\bwood|дерев"),
 ]
 
+# кириллические написания материалов: ПЛА, ПЕТГ, АБС, ТПУ
+_NC = "(?<![А-Яа-яІіЇїЄє]){}(?![А-Яа-яІіЇїЄє])"
+CYR = [(_NC.format(ua), en) for ua, en in (("ПЛА", "PLA"), ("ПЕТГ", "PETG"), ("АБС", "ABS"), ("ТПУ", "TPU"))]
+
 
 def material(name):
     # eSUN пишет ePLA/ePETG/eABS, а \b внутри слова не срабатывает: убираем префикс
     name = re.sub(r"(?<![A-Za-z])e(?=(?:PLA|PETG|ABS|ASA|TPU|PC|PA)(?![a-z]))", "", name, flags=re.I)
     name = re.sub(r"(?<=[A-Z])(?=\d+A\b)", " ", name)  # TPU95A -> TPU 95A
+    name = re.sub(r"\bEco(?=PETG|PLA|ABS)", "", name)  # EcoPETG -> PETG
+    for ua, en in CYR:
+        name = re.sub(ua, en, name, flags=re.I)
     for mat, rx in MATERIALS:
         if re.search(rx, name, re.I):
             return mat
@@ -147,11 +154,12 @@ def color(name):
 
 def is_filament(name):
     """Отсекаем принтеры, сопла, смолу, сушилки и прочее из категорий."""
-    bad = r"resin|HALOT|LCD|High Precision|Freeprint|Surgical Guide|3D Pens|Rod Set|стрижн|стержн|смол|фотополімер|фотополимер|сушил|dryer|сопло|nozzle|ручк|\bpen\b|запчаст|\bстіл\b|\bстол\b"
+    bad = r"resin|HALOT|LCD|High Precision|Freeprint|swatch|стінки котушк|стенки катушк|reusable spool|empty spool|порожня котушк|зразк|образц|палітра кольор|Surgical Guide|3D Pens|Rod Set|стрижн|стержн|смол|фотополімер|фотополимер|сушил|dryer|сопло|nozzle|ручк|\bpen\b|запчаст|\bстіл\b|\bстол\b"
     if re.search(bad, name, re.I):
         return False
-    # «для 3D принтера» — это пластик, а «3D принтер Creality ...» — сам принтер
-    return not re.search(r"(?<!для )(?<!для 3D )(?<!для 3D-)\b(?:3D[- ]?)?принтер|\bprinter\b(?!.*filament)", name, re.I)
+    # «для/до 3D(3Д) принтера» — это пластик, а «3D принтер Creality ...» — сам принтер
+    n = re.sub(r"\b(?:для|до|for)\s+(?:3[DdДд][- ]?)?(?:принтер|printer)\w*", "", name, flags=re.I)
+    return not re.search(r"принтер|\bprinter\b(?!.*filament)", n, re.I)
 
 
 def normalize(o):
@@ -163,6 +171,10 @@ def normalize(o):
     o.setdefault("color", color(n))
     if not o.get("weight"):
         o["weight"] = weight_kg(n)
+    # у Bambu Lab вес в названии часто не пишут: стандартная катушка 1 кг (оценка)
+    if not o.get("weight") and (o.get("brand") or "").startswith("Bambu") \
+            and not re.search(r"support|PVA|набір|набор|\bset\b|комплект", n, re.I):
+        o["weight"], o["weight_est"] = 1.0, 1
     o.setdefault("diameter", diameter(n))
     p, w = o.get("price"), o.get("weight")
     o["ppk"] = round(p / w) if p and w else None

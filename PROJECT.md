@@ -21,6 +21,10 @@ scraper/sources/hotline.py      каталог Hotline, 27 стр. x 48
 scraper/sources/opencart.py     магазины OpenCart/Journal (3ddevice)
 scraper/sources/prom_seller.py  продавец Prom: ItemList со страницы компании + ld+json каждого товара
 scraper/sources/ldjson.py       разбор schema.org Product/ItemList
+scraper/sources/woocommerce.py  WooCommerce Store API /wp-json/wc/store/v1/products (цена в копейках)
+scraper/sources/shopify.py      Shopify /products.json, каждый вариант — отдельная позиция
+scraper/sources/cards.py        универсальный парсер HTML-карточек (маркер карточки + шаблон страниц)
+scraper/sources/ld_listing.py   Product/Offer из ld+json на страницах категорий (сайты на Prom, 3D4U)
 site/                     PWA: index.html, app.js, style.css, sw.js, manifest, иконки
 tools/make_icons.py       генерит icon-192/512.png без библиотек
 .claude/launch.json       локальный сервер: python -m http.server 8765 -d site
@@ -29,11 +33,16 @@ tools/make_icons.py       генерит icon-192/512.png без библиот�
 ## Добавить источник
 - Продавец Prom: строка в `scraper/shops.json` с `"type": "prom_seller"` и URL страницы компании `https://prom.ua/ua/cNNN-name.html`.
 - Магазин на OpenCart с темой Journal: `"type": "opencart"` + URL категории.
+- WooCommerce: `"type": "woocommerce"`, `url` сайта, `category` — id категории филамента (из `/wp-json/wc/store/v1/products/categories`).
+- Shopify: `"type": "shopify"`, `url` сайта.
+- Любой другой сайт со списком карточек: `"type": "cards"`, `urls` категорий, `card` — начало карточки в HTML (`re:` = regex), `page` — шаблон пагинации (`?page={n}`, `/page-{n}`), опц. `price` (regex), `stock: "class"`. 404 на странице >1 = конец пагинации.
+- Сайт с ld+json Product в списке: `"type": "ld_listing"`, `urls`, `page`.
+- `every_h` — не чаще, чем раз в N часов (Hotline, Tucans).
 - Другой движок: новый модуль в `scraper/sources/` с функцией `scrape(shop) -> list[dict]`, зарегистрировать в `TYPES` в run.py.
 
 ## Формат данных
 `offers.json`: `{updated, shops:[{id,name,ok,count,at,error?}], items:[...]}`.
-Поля товара: `id` (`источник:ключ`), `src`, `shop`, `title`, `brand`, `material`, `color`, `weight` (кг), `price` (₴, мин.), `price_max` (только Hotline), `offers` (только Hotline), `stock` (`in`/`order`/`out`/`unknown`), `ppk` (₴/кг), `url`, `image`.
+Поля товара: `id` (`источник:ключ`), `src`, `shop`, `title`, `brand`, `material`, `color`, `weight` (кг), `price` (₴, мин.), `price_max` (только Hotline), `offers` (только Hotline), `stock` (`in`/`order`/`out`/`unknown`), `ppk` (₴/кг), `url`, `weight_est` (1 = вес не указан, для Bambu Lab взят 1 кг; в UI «≈»). Картинки не храним (размер данных ~2 МБ).
 `history.json`: `{id: [[YYYY-MM-DD, цена, наличие 1/2/0], ...]}`; новая точка только при изменении цены или наличия.
 Если источник упал, остаются его товары из прошлого запуска, в `shops[]` `ok:false`.
 
@@ -44,4 +53,7 @@ tools/make_icons.py       генерит icon-192/512.png без библиот�
 | 3ddevice.com.ua `/en/shop/3d-plastics/?page=N` | ~340 позиций, бренд, цена; нет цены у товаров не в наличии | Наличие определяем по классу `out-of-stock` карточки (TENTATIVE) |
 | Prom, продавец PlastFill `c3804832-plastfill` | 29 позиций (22 филамента), цена, наличие из ld+json | По просьбе пользователя |
 | ek.ua | — | 403 Cloudflare |
+
+Профильные магазины (локальный прогон 2026-11-11, позиций после фильтра): UA3D 780 (woo), BambuLab UA bambulab.net.ua 717 (woo), Тірапласт 156 (woo), DC Print 154 (woo), PYD 187 (shopify), 3DPlast 127, Filament Shop 30, BOZE 73, Bambu UA bambu.net.ua 276, ALL3DP 254, SUNLU3D 168 (cards), 3D4U 12, PBL 8, UA3D.Pro 807, U3DF 9 (ld_listing). Tucans (cards) с моего IP отдаёт 403 даже на главной — TENTATIVE, проверить из Actions.
+Список магазинов брал в том числе с агрегатора de-filament.com.ua (только как подсказку, его не парсим).
 Магазины, которые встречаются в предложениях Hotline (выборка из 60 товаров): Enko, Brain, ITbox, EXE.ua, MTA.UA, ELMIR, CAN.UA, Q-TECHNO, MALLPRIX, dp-shop, Comtrading, iCom, FunOpt, NBPLAZA, Comfy, Rozetka не замечен. В основном это магазины электроники, профильных магазинов среди них почти нет.

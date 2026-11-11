@@ -1,7 +1,41 @@
 [
   {"id": "hotline", "name": "Hotline", "type": "hotline", "every_h": 11.5},
+
+  {"id": "ua3d", "name": "UA3D", "type": "woocommerce", "url": "https://ua3d.com.ua", "category": 649},
+  {"id": "bambulabua", "name": "BambuLab UA", "type": "woocommerce", "url": "https://www.bambulab.net.ua", "category": 68},
+  {"id": "tiraplast", "name": "Тірапласт", "type": "woocommerce", "url": "https://tiraplast.com.ua"},
+  {"id": "dcprint", "name": "DC Print", "type": "woocommerce", "url": "https://dcprint.com.ua"},
+
+  {"id": "pyd", "name": "PYD", "type": "shopify", "url": "https://pyd.com.ua"},
+
+  {"id": "tucans", "name": "Tucans", "type": "cards", "every_h": 11.5,
+   "urls": ["https://tucans.com.ua/3d-ustrojstva-ua-ru/rashodnye-materialy-ua-ru/plastik-dlya-3d-printeru-ua-ru"],
+   "card": "class=\"col product-item", "page": "?page={n}"},
+  {"id": "3dplast", "name": "3DPlast", "type": "cards",
+   "urls": ["https://3dplast.ua/products/"], "card": "<div class=\"item\">", "page": "?page={n}"},
+  {"id": "filshop", "name": "Filament Shop", "type": "cards",
+   "urls": ["https://filament-shop.in.ua/plastik-dlya-3d-pechati"], "card": "class=\"product-thumb", "page": "?page={n}"},
+  {"id": "boze", "name": "BOZE", "type": "cards",
+   "urls": ["https://boze.com.ua/PLA-ua", "https://boze.com.ua/CoPET-PETg-ua", "https://boze.com.ua/pla-silk-ua"],
+   "card": "class=\"product-layout", "page": "?page={n}"},
+  {"id": "bambunet", "name": "Bambu UA", "type": "cards",
+   "urls": ["https://bambu.net.ua/catalog/filament"], "card": "class=\"product_preview fn_product", "page": "/page-{n}"},
+  {"id": "all3dp", "name": "ALL3DP", "type": "cards",
+   "urls": ["https://all3dp.com.ua/filament-plastik-dlya-3d-printera"], "card": "<li data-aos", "page": "?page={n}"},
+  {"id": "sunlu3d", "name": "SUNLU3D", "type": "cards", "stock": "class",
+   "urls": ["https://sunlu3d.com.ua/kupyty-filament/"], "card": "re:<div class=\"card[\" ]"},
   {"id": "3ddevice", "name": "3DDevice", "type": "opencart",
    "url": "https://3ddevice.com.ua/en/shop/3d-plastics/"},
+
+  {"id": "3d4u", "name": "3D4U", "type": "ld_listing",
+   "urls": ["https://3d4u.com.ua/uk/3d-materials/c6"], "page": "?page={n}"},
+  {"id": "pbl", "name": "PBL", "type": "ld_listing",
+   "urls": ["https://pbl.in.ua/ua/product_list"], "page": "/page_{n}"},
+  {"id": "ua3dpro", "name": "UA3D.Pro", "type": "ld_listing",
+   "urls": ["https://ua3d.pro/ua/g129328534-plastik-dlya-pechati"], "page": "/page_{n}"},
+  {"id": "u3df", "name": "U3DF", "type": "ld_listing",
+   "urls": ["https://u3df.com.ua/ua/product_list"], "page": "/page_{n}"},
+
   {"id": "plastfill", "name": "PlastFill (Prom)", "type": "prom_seller",
    "url": "https://prom.ua/ua/c3804832-plastfill.html"}
 ]

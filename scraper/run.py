@@ -3,6 +3,7 @@
 Запуск: python scraper/run.py [id_магазина ...]
 """
 import json
+import re
 import pathlib
 import sys
 import time
@@ -11,13 +12,14 @@ from datetime import datetime, timezone
 
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
 from common import diameter, is_filament, material, normalize  # noqa: E402
-from sources import hotline, opencart, prom_seller  # noqa: E402
+from sources import cards, hotline, ld_listing, opencart, prom_seller, shopify, woocommerce  # noqa: E402
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 DATA = ROOT / "site" / "data"
-TYPES = {"hotline": hotline, "opencart": opencart, "prom_seller": prom_seller}
+TYPES = {"hotline": hotline, "opencart": opencart, "prom_seller": prom_seller, "cards": cards,
+         "ld_listing": ld_listing, "woocommerce": woocommerce, "shopify": shopify}
 KEEP = ("id", "shop", "title", "brand", "material", "color", "weight", "price",
-        "price_max", "offers", "stock", "ppk", "url", "image")
+        "price_max", "offers", "stock", "ppk", "url", "weight_est")
 
 
 def load(name, default):
@@ -36,8 +38,14 @@ def clean(o):
     return {k: o[k] for k in KEEP if o.get(k) is not None}
 
 
+FILAMENT_WORD = re.compile(r"філамент|филамент|filament|пластик|plastic|нитк|пруток", re.I)
+
+
 def keep(o):
     if o.get("kind") and "філамент" not in o["kind"].lower():
+        return False
+    # без распознанного материала оставляем только то, что прямо названо пластиком/филаментом
+    if material(o["title"]) == "Other" and not FILAMENT_WORD.search(o["title"]):
         return False
     return is_filament(o["title"]) and diameter(o["title"]) != 2.85
 
@@ -71,6 +79,8 @@ def main(only):
             status.append({"id": shop["id"], "name": shop["name"], "ok": False,
                            "count": len(old), "at": last.get("at"), "error": str(e)[:200]})
 
+    # старые записи могли сохраниться с полями, которых уже нет в KEEP
+    items = [{k: v for k, v in i.items() if k in KEEP or k == "src"} for i in items]
     DATA.mkdir(exist_ok=True)
     (DATA / "offers.json").write_text(json.dumps(
         {"updated": now(), "shops": status, "items": items},

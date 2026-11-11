@@ -2,7 +2,8 @@
 import math, pathlib, struct, zlib
 
 def png(path, n):
-    bg, blue, light = (0x16, 0x18, 0x1d), (0x2a, 0x62, 0xd9), (0x6b, 0x9b, 0xff)
+    bg = (0x0e, 0x0f, 0x13)
+    a, b = (0x6b, 0x55, 0xf5), (0xc0, 0x7b, 0xff)
     s = n / 512
     rows = []
     for yy in range(n):
@@ -10,9 +11,12 @@ def png(path, n):
         for xx in range(n):
             d = math.hypot(xx + .5 - 256 * s, yy + .5 - 256 * s) / s
             c = bg
-            if d <= 150: c = blue
-            if abs(d - 110) <= 7 or abs(d - 74) <= 7: c = light
-            if d <= 38: c = bg
+            if d <= 160:  # диагональный градиент, как в icon.svg
+                t = min(1, max(0, (xx + yy) / (2 * n)))
+                c = tuple(round(a[k] + (b[k] - a[k]) * t) for k in range(3))
+                if abs(d - 118) <= 6 or abs(d - 84) <= 6:
+                    c = tuple(round(v + (255 - v) * .35) for v in c)
+            if d <= 44: c = bg
             row += bytes(c)
         rows.append(bytes(row))
     raw = zlib.compress(b"".join(rows), 9)
