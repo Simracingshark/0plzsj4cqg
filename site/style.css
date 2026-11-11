@@ -271,3 +271,78 @@ select {
   position: absolute; top: 2px; pointer-events: none; background: var(--ink); color: var(--bg);
   font-size: 12px; font-weight: 700; padding: 5px 9px; border-radius: 8px; white-space: nowrap; transform: translateX(-50%);
 }
+
+/* ---------- точки материалов ---------- */
+.mdot {
+  display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; vertical-align: 1px; flex: none;
+  background: oklch(.68 .17 var(--h)); box-shadow: 0 0 0 3px oklch(.68 .17 var(--h) / .18);
+}
+.mdot[data-cf] { background: repeating-linear-gradient(45deg, #2a2a30 0 2px, #6a6a74 2px 4px); box-shadow: 0 0 0 3px rgb(120 120 130 / .2); }
+.chip .mdot { margin-right: 5px; }
+.chip.on .mdot { box-shadow: none; }
+
+/* ---------- пульс ринку ---------- */
+.pulse-wrap { margin: 2px 0 14px; }
+.pulse-h { font-size: 12px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin: 4px 2px 8px; display: flex; gap: 8px; align-items: baseline; }
+.pulse-h small { font-weight: 600; letter-spacing: 0; text-transform: none; }
+.pulse {
+  display: flex; gap: 10px; overflow-x: auto; scroll-snap-type: x mandatory; margin: 0 -16px; padding: 2px 16px 6px; scroll-padding-inline: 16px;
+  scrollbar-width: none;
+}
+.pulse::-webkit-scrollbar { display: none; }
+.pcard {
+  flex: none; width: 138px; scroll-snap-align: start; text-align: left; display: grid; gap: 6px;
+  padding: 12px 13px; border-radius: var(--r); border: 1px solid var(--line);
+  background: linear-gradient(160deg, var(--surface), var(--surface2)); box-shadow: var(--shadow);
+  transition: transform .15s, border-color .15s;
+}
+.pcard:active { transform: scale(.97); }
+.pcard.on { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft), var(--shadow); }
+.pcard .pm { font-size: 12.5px; font-weight: 800; color: var(--ink2); display: flex; align-items: center; }
+.pcard b { font-size: 21px; font-weight: 800; letter-spacing: -.02em; line-height: 1; }
+.pcard b small { font-size: 11px; font-weight: 700; color: var(--muted); letter-spacing: 0; }
+.pbar { height: 4px; border-radius: 4px; background: var(--surface2); overflow: hidden; }
+.pcard .pbar { background: color-mix(in srgb, var(--ink) 8%, transparent); }
+.pbar i { display: block; height: 100%; border-radius: 4px; background: linear-gradient(90deg, var(--good), var(--accent)); }
+.pmed { white-space: nowrap; font-size: 11px; font-weight: 600; color: var(--muted); }
+
+/* ---------- метка «дешевше медіани» ---------- */
+.tag.deal { background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent); text-transform: none; letter-spacing: 0; }
+
+/* ---------- шкала в карточке ---------- */
+.gauge { margin: 6px 0 4px; padding: 14px; border-radius: var(--r); background: var(--surface2); }
+.g-head { display: flex; justify-content: space-between; gap: 10px; font-size: 12.5px; color: var(--ink2); flex-wrap: wrap; }
+.g-head .good { color: var(--good); } .g-head .bad { color: var(--bad); }
+.g-track {
+  position: relative; height: 8px; margin: 14px 0 8px; border-radius: 8px;
+  background: linear-gradient(90deg, var(--good), color-mix(in srgb, var(--warn) 80%, var(--good)) 55%, var(--bad));
+  opacity: .9;
+}
+.g-med { position: absolute; top: -3px; width: 2px; height: 14px; margin-left: -1px; background: var(--ink); opacity: .45; border-radius: 2px; }
+.g-pin {
+  position: absolute; top: 50%; width: 18px; height: 18px; margin: -9px 0 0 -9px; border-radius: 50%;
+  background: var(--surface); border: 4px solid var(--ink); box-shadow: 0 2px 8px rgb(0 0 0 / .3);
+}
+.g-scale { display: flex; justify-content: space-between; font-size: 11px; font-weight: 600; color: var(--muted); }
+
+/* ---------- альтернативы ---------- */
+.alts { display: grid; gap: 6px; }
+.alt {
+  display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; text-align: left;
+  padding: 10px 12px; border-radius: var(--r-sm); border: 1px solid var(--line); background: var(--surface);
+}
+.alt .sw { width: 28px; height: 28px; }
+.a-t { min-width: 0; display: grid; }
+.a-t span { font-size: 13px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.a-t small, .a-p small { font-size: 11.5px; color: var(--muted); font-weight: 600; }
+.a-p { text-align: right; display: grid; white-space: nowrap; }
+.a-p b { font-size: 13.5px; } .a-p small { color: var(--good); }
+
+/* ---------- плавное появление ---------- */
+@media (prefers-reduced-motion: no-preference) {
+  .item, .best-card, .pcard { animation: rise .35s cubic-bezier(.2, .7, .2, 1) both; }
+  .item:nth-child(2) { animation-delay: .03s; } .item:nth-child(3) { animation-delay: .06s; }
+  .item:nth-child(4) { animation-delay: .09s; } .item:nth-child(5) { animation-delay: .12s; }
+  @keyframes rise { from { opacity: 0; transform: translateY(8px); } }
+}
+.alt .sw::after { inset: 9px; }

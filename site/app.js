@@ -78,13 +78,34 @@ function countBy(xs, k) {
 function fillSelect(sel, pairs) {
   $(sel).insertAdjacentHTML("beforeend", pairs.map(([v, n]) => `<option value="${esc(v)}">${esc(v)} · ${n}</option>`).join(""));
 }
+// по каждому материалу: минимум, медиана, 90-й перцентиль ₴/кг (в наличии, без Hotline)
+const MST = new Map();
 function computeBest() {
-  BEST.clear();
+  BEST.clear(); MST.clear();
+  const by = new Map();
   for (const i of DATA.items) {
     if (i.stock !== "in" || !i.ppk || i.src === "hotline") continue;
     const b = BEST.get(i.material);
     if (!b || i.ppk < b) BEST.set(i.material, i.ppk);
+    if (!by.has(i.material)) by.set(i.material, []);
+    by.get(i.material).push(i.ppk);
   }
+  for (const [m, xs] of by) {
+    xs.sort((a, b) => a - b);
+    const q = p => xs[Math.min(xs.length - 1, Math.floor(p * xs.length))];
+    MST.set(m, { min: xs[0], med: q(.5), p90: q(.9), n: xs.length });
+  }
+}
+/* цвет точки материала */
+const MAT_HUE = { "PLA": 265, "PLA+": 290, "PETG": 200, "ABS": 25, "ASA": 45, "TPU": 150, "CoPET": 185, "PCTG": 215,
+  "PLA-CF": 0, "PETG-CF": 0, "PA-CF": 0, "PA": 330, "PC": 230, "PET": 175, "PVA": 95, "HIPS": 60 };
+const matDot = m => m in MAT_HUE ? `<i class="mdot" style="--h:${MAT_HUE[m]}"${m.endsWith("-CF") ? " data-cf" : ""}></i>` : "";
+const shopName = i => i.src === "hotline" ? `Hotline · ${i.offers} пропоз.` : esc(i.shop) + (i.seller ? ` · ${esc(i.seller)}` : "");
+// на сколько процентов ₴/кг ниже медианы материала
+function deal(i) {
+  const st = MST.get(i.material);
+  if (!st || !i.ppk || i.src === "hotline" || st.n < 5) return 0;
+  return Math.round((1 - i.ppk / st.med) * 100);
 }
 
 /* ---------- фильтры ---------- */
@@ -92,8 +113,27 @@ function saveF() { store.set("f2", F); }
 function renderMats() {
   const counts = countBy(DATA.items.filter(i => !F.stock || i.stock === "in"), "material");
   $("#mats").innerHTML = `<button class="chip ${F.mat ? "" : "on"}" data-m="">Усі</button>` +
-    counts.map(([m, n]) => `<button class="chip ${F.mat === m ? "on" : ""}" data-m="${esc(m)}">${esc(MAT_NAME(m))} <small>${n}</small></button>`).join("");
+    counts.map(([m, n]) => `<button class="chip ${F.mat === m ? "on" : ""}" data-m="${esc(m)}">${matDot(m)}${esc(MAT_NAME(m))} <small>${n}</small></button>`).join("");
+  renderPulse();
 }
+/* полоса «пульс ринку»: мин. и медиана ₴/кг по ходовым материалам */
+function renderPulse() {
+  const mats = ["PLA", "PETG", "PLA+", "ABS", "TPU", "ASA", "CoPET", "PA-CF", "PLA-CF", "PETG-CF", "PC", "PA"].filter(m => MST.has(m));
+  $("#pulse").innerHTML = mats.map(m => {
+    const st = MST.get(m), spread = Math.min(100, Math.round(st.min / st.med * 100));
+    return `<button class="pcard ${F.mat === m ? "on" : ""}" data-m="${esc(m)}">
+      <span class="pm">${matDot(m)}${esc(m)}</span>
+      <b>${num(st.min)}<small> ₴/кг</small></b>
+      <span class="pbar"><i style="width:${spread}%"></i></span>
+      <span class="pmed">медіана ${num(st.med)} · ${num(st.n)}</span>
+    </button>`;
+  }).join("");
+}
+$("#pulse").addEventListener("click", e => {
+  const b = e.target.closest("[data-m]");
+  if (!b) return;
+  F.mat = F.mat === b.dataset.m ? "" : b.dataset.m; saveF(); renderMats(); render();
+});
 $("#mats").addEventListener("click", e => {
   const b = e.target.closest("[data-m]");
   if (!b) return;
@@ -157,10 +197,10 @@ function card(i) {
     <div class="t">${esc(i.title)}</div>
     <div class="p"><b>${price}</b>${i.ppk ? `<span>${num(i.ppk)} ₴/кг</span>` : `<span class="na">вага ?</span>`}</div>
     <div class="meta">
-      <span class="shop">${hot ? `Hotline · ${i.offers} пропоз.` : esc(i.shop)}</span>
+      <span class="shop">${shopName(i)}</span>
       <span class="st st-${i.stock || "unknown"}">${STOCK[i.stock] || STOCK.unknown}</span>
       ${i.weight ? `<span${i.weight_est ? ' title="вага не вказана, оцінка"' : ""}>${i.weight_est ? "≈" : ""}${num(i.weight, 2)} кг</span>` : ""}
-      ${isBest ? `<span class="tag best">найдешевше</span>` : ""}
+      ${isBest ? `<span class="tag best">найдешевше</span>` : deal(i) >= 10 ? `<span class="tag deal">−${deal(i)}% до медіани</span>` : ""}
       ${favs.has(i.id) ? `<span class="tag fav">★</span>` : ""}
     </div>
   </li>`;
@@ -192,10 +232,10 @@ function renderBest() {
     return (x < 0 ? 99 : x) - (y < 0 ? 99 : y) || a.material.localeCompare(b.material);
   });
   $("#best").innerHTML = rows.map(i => `<div class="best-card" data-id="${esc(i.id)}">
-    <div class="mat">${esc(i.material)}</div>
+    <div class="mat">${matDot(i.material)}${esc(i.material)}</div>
     <div class="big">${num(i.ppk)} <small>₴/кг</small></div>
     <div class="name">${esc(i.title)}</div>
-    <div class="where">${i.src === "hotline" ? "Hotline · мін. ціна" : esc(i.shop)} · ${num(i.price)} ₴</div>
+    <div class="where">${i.src === "hotline" ? "Hotline · мін. ціна" : shopName(i)} · ${num(i.price)} ₴</div>
   </div>`).join("") || `<div class="empty">Немає даних</div>`;
 }
 $$("#best-mode button").forEach(b => b.onclick = () => {
@@ -211,13 +251,14 @@ async function openItem(id) {
   const props = [i.material && MAT_NAME(i.material), i.brand, i.color, i.weight && (i.weight_est ? "≈" : "") + num(i.weight, 2) + " кг" + (i.weight_est ? " (оцінка)" : "")].filter(Boolean);
   $("#sheet-body").innerHTML = `
     <div class="d-hero">${swatch(i)}<div><h2>${esc(i.title)}</h2>
-      <div class="sub">${hot ? `Hotline · ${i.offers} пропозицій` : esc(i.shop)} · <span class="st st-${i.stock}">${STOCK[i.stock] || ""}</span></div></div></div>
+      <div class="sub">${hot ? `Hotline · ${i.offers} пропозицій` : shopName(i)} · <span class="st st-${i.stock}">${STOCK[i.stock] || ""}</span></div></div></div>
     <div class="d-stats">
       <div class="d-stat"><span>${i.price_max && i.price_max !== i.price ? "Ціна від" : "Ціна"}</span><b>${num(i.price)} ₴</b></div>
       <div class="d-stat"><span>За кг</span><b>${i.ppk ? num(i.ppk) + " ₴" : "—"}</b></div>
       <div class="d-stat"><span>${hot ? "Ціна до" : "За грам"}</span><b>${hot ? num(i.price_max) + " ₴" : i.ppk ? num(i.ppk / 1000, 2) + " ₴" : "—"}</b></div>
     </div>
     <div class="d-props">${props.map(p => `<span>${esc(p)}</span>`).join("")}</div>
+    ${gauge(i)}
     <div class="d-actions">
       <a class="btn" href="${esc(i.url)}" target="_blank" rel="noopener">${hot ? "Усі магазини на Hotline ↗" : "Відкрити в магазині ↗"}</a>
       <button class="btn ghost" id="fav">${favs.has(i.id) ? "★ В обраному" : "☆ В обране"}</button>
@@ -225,7 +266,8 @@ async function openItem(id) {
       ${i.price && i.weight ? `<button class="btn ghost" id="tocmp" style="grid-column:span 2">До порівняння з доставкою</button>` : ""}
     </div>
     <h3 class="sec">Ціна в часі</h3>
-    <div class="chart" id="chart"><div class="empty-c">Завантаження…</div></div>`;
+    <div class="chart" id="chart"><div class="empty-c">Завантаження…</div></div>
+    ${alts(i)}`;
   const dlg = $("#sheet");
   dlg.showModal();
   $("#fav").onclick = e => {
@@ -239,7 +281,32 @@ async function openItem(id) {
     cmpRows.push({ n: i.shop + ": " + i.title.slice(0, 40), p: i.price, w: i.weight, d: "" });
     saveCmp(); renderCmp(); dlg.close(); go("calc");
   };
+  $$("#sheet-body .alt").forEach(a => a.onclick = () => openItem(a.dataset.id));
   drawChart($("#chart"), (await history())[i.id] || []);
+}
+/* шкала: где эта цена за кг среди предложений материала (мин … 90-й перцентиль) */
+function gauge(i) {
+  const st = MST.get(i.material);
+  if (!st || !i.ppk || st.n < 5 || st.p90 <= st.min) return "";
+  const pos = v => Math.max(0, Math.min(100, (v - st.min) / (st.p90 - st.min) * 100));
+  const d = deal(i);
+  const verdict = d >= 10 ? `<b class="good">на ${d}% дешевше</b> за медіану` : d <= -10 ? `<b class="bad">на ${-d}% дорожче</b> за медіану` : "близько до медіани";
+  return `<div class="gauge">
+    <div class="g-head"><span>${esc(i.material)} · ${num(st.n)} пропозицій</span><span>${verdict}</span></div>
+    <div class="g-track"><i class="g-med" style="left:${pos(st.med)}%"></i><i class="g-pin" style="left:${pos(i.ppk)}%"></i></div>
+    <div class="g-scale"><span>${num(st.min)} ₴</span><span>медіана ${num(st.med)} ₴</span><span>${num(st.p90)} ₴+</span></div>
+  </div>`;
+}
+/* дешевле за кг: тот же материал и цвет, в наличии */
+function alts(i) {
+  if (!i.ppk || !i.material || i.material === "Other") return "";
+  const xs = DATA.items.filter(x => x.id !== i.id && x.material === i.material && x.stock === "in" && x.ppk && x.ppk < i.ppk &&
+    x.src !== "hotline" && (!i.color || x.color === i.color)).sort((a, b) => a.ppk - b.ppk).slice(0, 5);
+  if (!xs.length) return "";
+  return `<h3 class="sec">Дешевше за кг${i.color ? ` · ${esc(i.color.toLowerCase())}` : ""}</h3>
+    <div class="alts">${xs.map(x => `<button class="alt" data-id="${esc(x.id)}">${swatch(x)}
+      <span class="a-t"><span>${esc(x.title)}</span><small>${shopName(x)}</small></span>
+      <span class="a-p"><b>${num(x.ppk)} ₴/кг</b><small>−${Math.round((1 - x.ppk / i.ppk) * 100)}%</small></span></button>`).join("")}</div>`;
 }
 $$("dialog").forEach(d => d.addEventListener("click", e => { if (e.target === d) d.close(); }));
 

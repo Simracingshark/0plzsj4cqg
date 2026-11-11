@@ -12,14 +12,16 @@ from datetime import datetime, timezone
 
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
 from common import diameter, is_filament, material, normalize  # noqa: E402
-from sources import cards, hotline, ld_listing, opencart, prom_seller, shopify, woocommerce  # noqa: E402
+from sources import (cards, hotline, ld_listing, monofilament, opencart, prom_search,  # noqa: E402
+                     prom_seller, shopify, woocommerce)
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 DATA = ROOT / "site" / "data"
 TYPES = {"hotline": hotline, "opencart": opencart, "prom_seller": prom_seller, "cards": cards,
-         "ld_listing": ld_listing, "woocommerce": woocommerce, "shopify": shopify}
+         "ld_listing": ld_listing, "woocommerce": woocommerce, "shopify": shopify,
+         "monofilament": monofilament, "prom_search": prom_search}
 KEEP = ("id", "shop", "title", "brand", "material", "color", "weight", "price",
-        "price_max", "offers", "stock", "ppk", "url", "weight_est")
+        "price_max", "offers", "stock", "ppk", "url", "weight_est", "seller")
 
 
 def load(name, default):

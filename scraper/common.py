@@ -53,7 +53,7 @@ MATERIALS = [
     ("PETG", r"\bPETG\b|\bPET-G\b"),
     ("PET", r"\bPET\b"),
     ("PLA+", r"\bPLA\s*\+|\bPLA[\s-]*plus\b|\bPLA[\s-]*Pro\b"),
-    ("PLA", r"\bH?PLA\b|\bFiberSilk\b"),
+    ("PLA", r"\bH?PLA\b|\bFiberSilk\b|\bSilk\b"),  # «Silk» без материала — шовковий PLA
     ("ABS", r"\bABS\b"),
     ("ASA", r"\bASA\b"),
     ("TPU", r"\bTPU\b|\bTPEE?\b|\bflex\b|\belastan\b|гнучк|флекс"),
@@ -69,13 +69,15 @@ MATERIALS = [
 
 # кириллические написания материалов: ПЛА, ПЕТГ, АБС, ТПУ
 _NC = "(?<![А-Яа-яІіЇїЄє]){}(?![А-Яа-яІіЇїЄє])"
-CYR = [(_NC.format(ua), en) for ua, en in (("ПЛА", "PLA"), ("ПЕТГ", "PETG"), ("АБС", "ABS"), ("ТПУ", "TPU"))]
+CYR = [(_NC.format(ua), en) for ua, en in (("ПЛА", "PLA"), ("ПЕТГ", "PETG"), ("АБС", "ABS"), ("ТПУ", "TPU"),
+                                          ("со[РP][ЕE][ТT]", "CoPET"))]  # «соРЕТ» набрано кириллицей
 
 
 def material(name):
     # eSUN пишет ePLA/ePETG/eABS, а \b внутри слова не срабатывает: убираем префикс
     name = re.sub(r"(?<![A-Za-z])e(?=(?:PLA|PETG|ABS|ASA|TPU|PC|PA)(?![a-z]))", "", name, flags=re.I)
     name = re.sub(r"(?<=[A-Z])(?=\d+A\b)", " ", name)  # TPU95A -> TPU 95A
+    name = re.sub(r"\b(PLA|PETG|ABS|ASA|TPU)(?=\d)", r"\1 ", name, flags=re.I)  # ABS1.75, TPU90
     name = re.sub(r"\bEco(?=PETG|PLA|ABS)", "", name)  # EcoPETG -> PETG
     for ua, en in CYR:
         name = re.sub(ua, en, name, flags=re.I)
@@ -154,7 +156,7 @@ def color(name):
 
 def is_filament(name):
     """Отсекаем принтеры, сопла, смолу, сушилки и прочее из категорий."""
-    bad = r"resin|HALOT|LCD|High Precision|Freeprint|swatch|стінки котушк|стенки катушк|reusable spool|empty spool|порожня котушк|зразк|образц|палітра кольор|Surgical Guide|3D Pens|Rod Set|стрижн|стержн|смол|фотополімер|фотополимер|сушил|dryer|сопло|nozzle|ручк|\bpen\b|запчаст|\bстіл\b|\bстол\b"
+    bad = r"resin|HALOT|LCD|High Precision|Freeprint|swatch|^котушка|котушка для філамент|багаторазов\w* котушк|\bклей\b|стінки котушк|стенки катушк|reusable spool|empty spool|порожня котушк|зразк|образц|палітра кольор|Surgical Guide|3D Pens|Rod Set|стрижн|стержн|смол|фотополімер|фотополимер|сушил|dryer|сопло|nozzle|ручк|\bpen\b|запчаст|\bстіл\b|\bстол\b"
     if re.search(bad, name, re.I):
         return False
     # «для/до 3D(3Д) принтера» — это пластик, а «3D принтер Creality ...» — сам принтер
@@ -166,8 +168,8 @@ def normalize(o):
     """Дополняет оффер полями material/brand/color/weight/diameter/ppk."""
     n = o["title"]
     o.setdefault("material", material(n))
-    if not o.get("brand"):
-        o["brand"] = brand(n)
+    # бренд из названия; если магазин дал свой («BAMBU LAB») — приводим к общему написанию
+    o["brand"] = brand(o.get("brand") or "") or o.get("brand") or brand(n)
     o.setdefault("color", color(n))
     if not o.get("weight"):
         o["weight"] = weight_kg(n)

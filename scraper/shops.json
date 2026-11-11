@@ -8,9 +8,6 @@
 
   {"id": "pyd", "name": "PYD", "type": "shopify", "url": "https://pyd.com.ua"},
 
-  {"id": "tucans", "name": "Tucans", "type": "cards", "every_h": 11.5,
-   "urls": ["https://tucans.com.ua/3d-ustrojstva-ua-ru/rashodnye-materialy-ua-ru/plastik-dlya-3d-printeru-ua-ru"],
-   "card": "class=\"col product-item", "page": "?page={n}"},
   {"id": "3dplast", "name": "3DPlast", "type": "cards",
    "urls": ["https://3dplast.ua/products/"], "card": "<div class=\"item\">", "page": "?page={n}"},
   {"id": "filshop", "name": "Filament Shop", "type": "cards",
@@ -37,5 +34,17 @@
    "urls": ["https://u3df.com.ua/ua/product_list"], "page": "/page_{n}"},
 
   {"id": "plastfill", "name": "PlastFill (Prom)", "type": "prom_seller",
-   "url": "https://prom.ua/ua/c3804832-plastfill.html"}
+   "url": "https://prom.ua/ua/c3804832-plastfill.html"},
+
+  {"id": "allo", "name": "Allo", "type": "ld_listing", "every_h": 11.5,
+   "urls": ["https://allo.ua/ua/plastik-dlja-3d-pechati/"], "page": "/p-{n}/"},
+  {"id": "rozetka", "name": "Rozetka", "type": "ld_listing", "every_h": 11.5, "max_pages": 150,
+   "urls": ["https://rozetka.com.ua/ua/rashodnie-materiali-dlya-3d-printerov/c4671751/"], "page": "/page={n}/"},
+  {"id": "monofilament", "name": "MonoFilament", "type": "monofilament",
+   "urls": ["https://monofilament.com.ua/ua/products/standartnye-materialy",
+            "https://monofilament.com.ua/ua/products/inzhinernye-plastiki"]},
+  {"id": "prom", "name": "Prom", "type": "prom_search", "every_h": 11.5, "pages": 5,
+   "queries": ["PLA 1.75 філамент", "PLA+ 1.75 філамент", "PETG 1.75 філамент", "ABS 1.75 філамент",
+               "ASA 1.75 філамент", "TPU 1.75 філамент", "нейлон PA 1.75 філамент", "PC 1.75 філамент",
+               "PLA-CF 1.75 філамент", "PETG-CF 1.75 філамент"]}
 ]
