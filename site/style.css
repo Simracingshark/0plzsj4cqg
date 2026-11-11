@@ -134,6 +134,7 @@ main { max-width: 760px; margin: 0 auto; padding: 12px 16px; }
 .shop { font-weight: 700; color: var(--ink); }
 
 .empty { text-align: center; padding: 48px 16px; color: var(--muted); }
+.empty .btn-stock { margin-top: 14px; padding: 10px 18px; border: 0; border-radius: 999px; background: var(--accent); color: var(--on-accent); font: inherit; font-weight: 600; cursor: pointer; }
 .skel { height: 72px; border-radius: var(--r); background: linear-gradient(90deg, var(--surface) 0, var(--surface2) 50%, var(--surface) 100%) 0 0 / 200% 100%; animation: sh 1.2s linear infinite; }
 @keyframes sh { to { background-position: -200% 0; } }
 

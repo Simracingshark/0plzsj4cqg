@@ -372,10 +372,18 @@ function render(reset = true) {
   ROWS = rows();
   const n = ROWS.reduce((a, r) => a + r.items.length, 0);
   $("#count").textContent = ROWS.length === n ? `Знайдено ${num(n)}` : `${num(ROWS.length)} товарів · ${num(n)} пропозицій`;
-  $("#list").innerHTML = ROWS.length ? ROWS.slice(0, shown).map(card).join("") :
-    `<li class="empty">Нічого не знайдено.<br>Спробуй прибрати фільтри або змінити пошук.</li>`;
+  $("#list").innerHTML = ROWS.length ? ROWS.slice(0, shown).map(card).join("") : empty();
   $("#more").hidden = ROWS.length <= shown;
 }
+// пусто, но есть товары под заказ / без наличия — предложить их показать
+function empty() {
+  let hidden = 0;
+  if (F.stock !== "all") { const st = F.stock; F.stock = "all"; hidden = filtered().length; F.stock = st; }
+  return hidden ? `<li class="empty">У наявності нічого немає.<br>Під замовлення або відсутніх: ${num(hidden)}.
+      <br><button class="btn-stock" data-show-all>Показати їх</button></li>` :
+    `<li class="empty">Нічого не знайдено.<br>Спробуй прибрати фільтри або змінити пошук.</li>`;
+}
+$("#list").addEventListener("click", e => { if (e.target.closest("[data-show-all]")) { F.stock = "all"; fChanged(); } });
 $("#more").onclick = () => { shown += PAGE; render(false); };
 $("#list").addEventListener("click", e => { const li = e.target.closest("[data-id]"); if (li) openItem(li.dataset.id); });
 
