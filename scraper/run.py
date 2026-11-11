@@ -89,8 +89,9 @@ def main(only):
             status.append({"id": shop["id"], "name": shop["name"], "ok": False,
                            "count": len(old), "at": last.get("at"), "error": str(e)[:200]})
 
-    # старые записи могли сохраниться с полями, которых уже нет в KEEP
-    items = [{k: v for k, v in i.items() if k in KEEP or k == "src"} for i in items]
+    # старые записи могли сохраниться с полями, которых уже нет в KEEP или под новым фильтром
+    items = [{k: v for k, v in i.items() if k in KEEP or k == "src"}
+             for i in items if is_filament(i["title"])]
     DATA.mkdir(exist_ok=True)
     annotate(items, update_history(items))
     (DATA / "offers.json").write_text(json.dumps(

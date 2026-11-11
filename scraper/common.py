@@ -165,7 +165,7 @@ def color(name):
 
 def is_filament(name):
     """Отсекаем принтеры, сопла, смолу, сушилки и прочее из категорий."""
-    bad = r"resin|HALOT|LCD|High Precision|Freeprint|swatch|^котушка|котушка для філамент|багаторазов\w* котушк|\bклей\b|стінки котушк|стенки катушк|reusable spool|empty spool|порожня котушк|зразк|образц|палітра кольор|Surgical Guide|3D Pens|Rod Set|стрижн|стержн|смол|фотополімер|фотополимер|сушил|dryer|сопло|nozzle|ручк|\bpen\b|запчаст|\bстіл\b|\bстол\b"
+    bad = r"resin|HALOT|LCD|High Precision|Freeprint|swatch|^котушка|котушка для філамент|багаторазов\w* котушк|\bклей\b|стінки котушк|стенки катушк|reusable spool|empty spool|порожня котушк|зразк|образц|палітра кольор|перехідн|переходн|transition|Surgical Guide|3D Pens|Rod Set|стрижн|стержн|смол|фотополімер|фотополимер|сушил|dryer|сопло|nozzle|ручк|\bpen\b|запчаст|\bстіл\b|\bстол\b"
     if re.search(bad, name, re.I):
         return False
     # «для/до 3D(3Д) принтера» — это пластик, а «3D принтер Creality ...» — сам принтер
