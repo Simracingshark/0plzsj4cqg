@@ -8,7 +8,8 @@ GitHub Actions (cron, раз в ~4-6 ч)
 GitHub Pages
   └─ PWA (статика) читает data/*.json, работает офлайн, ставится на телефон
 ```
-- Аккаунт GitHub: `Simracingshark` (gh CLI залогинен). Репо планируется публичным (бесплатные Pages + Actions).
+- Репо: https://github.com/Simracingshark/0plzsj4cqg (публичное, ветка `main`). Pages будет на `https://simracingshark.github.io/0plzsj4cqg/`.
+- Git в репо: `user.email = 34916749+Simracingshark@users.noreply.github.com` (локально в репо, чтобы личный email не попал в коммиты).
 - Локально есть: Python 3.14.5, Node 24.20.0, git 2.53, gh 2.102.1.
 
 ## Источники (проверено curl с ПК 2026-11-11)
