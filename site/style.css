@@ -497,3 +497,14 @@ select {
 .d-stat s { display: block; font-size: 11.5px; color: var(--muted); }
 .spool { width: 104px; height: 86px; stroke: none; }
 .br-badge { font-size: 12px; font-weight: 800; color: var(--accent2); }
+
+/* v4: спокойная строка каталога */
+.item { gap: 4px 12px; padding: 14px 14px; }
+.item .t { font-size: 15px; font-weight: 650; line-height: 1.32; }
+.item .meta { gap: 0 6px; font-size: 13px; color: var(--muted); }
+.item .meta .sep { font-style: normal; opacity: .6; }
+.item .meta.tags { grid-column: 2 / span 2; margin-top: 2px; }
+.item .meta + .meta { grid-column: 2 / span 2; }
+.item .p span { background: none; padding: 0; margin-top: 2px; font-weight: 600; color: var(--accent); }
+.item .p span.na { background: none; color: var(--muted); }
+.item .nshops { color: var(--accent); font-weight: 650; }

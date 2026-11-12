@@ -342,36 +342,37 @@ function rows() {
 
 /* ---------- список ---------- */
 function badges(r) {
-  const i = r.lead, b = [];
-  const d = Math.max(...r.items.map(disc));
-  if (i.stock === "in" && i.ppk && i.src !== "hotline" && BEST.get(i.material) === i.ppk) b.push(`<span class="tag best">найдешевше</span>`);
-  if (d > 0) b.push(`<span class="tag sale">−${d}%</span>`);
-  if (r.items.some(x => x.drop) && !sale(i)) b.push(`<span class="tag drop">↓ за 30 днів</span>`);
-  if (r.items.some(x => x.new)) b.push(`<span class="tag new">новинка</span>`);
-  if (!b.length && deal(i) >= 15) b.push(`<span class="tag deal">−${deal(i)}% до медіани</span>`);
-  if (r.items.some(x => favs.has(x.id))) b.push(`<span class="tag fav">★</span>`);
-  return b.join("");
+  // в списке одна метка, самая полезная; остальное видно в карточке
+  const i = r.lead, d = Math.max(...r.items.map(disc));
+  const fav = r.items.some(x => favs.has(x.id)) ? `<span class="tag fav">★</span>` : "";
+  const one = d > 0 ? `<span class="tag sale">−${d}%</span>` :
+    r.items.some(x => x.drop) ? `<span class="tag drop">↓ ціна впала</span>` :
+    r.items.some(x => x.new) ? `<span class="tag new">новинка</span>` : "";
+  return one + fav;
+}
+// название без повторов: материал, вес и «пластик для 3D принтера» уже видны отдельно
+const L = String.raw`[\p{L}\d]`, NOISE = new RegExp(String.raw`(?<!${L})(?:філамент|филамент|filament|пластик|plastic|нитка|пруток)(?!${L})|(?:для|до|for)\s+(?:3[DdДд][- ]?)?(?:друк\p{L}*|печат\p{L}*|принтер\p{L}*|printer\p{L}*)|3[DdДд][- ]?(?:принтер|printer)\p{L}*|(?<![\w-])Ø?\s*1[.,]75\s*(?:mm|мм)?(?![\d-])|(?<!${L})\d+(?:[.,]\d+)?\s*(?:kg|кг)(?!${L})|(?<!${L})\d+\s*(?:м|m)(?!${L})|вага:?|діаметр:?|\([^)]{40,}\)|\([^)\s]*\d[^)\s]*\)`, "giu");
+function shortTitle(i) {
+  const t = i.title.replace(NOISE, " ").replace(/\s*\|\s*/g, ", ").replace(/\s*([,|/])(?:\s*[,|/—-])+/g, "$1").replace(/\s+([,|])/g, "$1")
+    .replace(/^[\s,|/·—-]+|[\s,|/·—-]+$/g, "").replace(/\s{2,}/g, " ").trim();
+  return t.length >= 6 ? t : i.title;
 }
 function card(r) {
   const i = r.lead, hot = i.src === "hotline", many = r.items.length > 1;
   const shops = new Set(r.items.map(x => x.shop + (x.seller || ""))).size;
   const from = many || (i.price_max && i.price_max !== i.price);
-  const tg = (i.tags || []).filter(t => t !== "cf" || !i.material.endsWith("CF")).slice(0, 3);
+  const where = many ? `<b class="nshops">${shops} ${plural(shops, "магазин", "магазини", "магазинів")}</b>` :
+    hot ? `Hotline · ${i.offers} пропоз.` : esc(shopName(i));
+  const bits = [`${matDot(i.material)}${esc(MAT_NAME(i.material))}`,
+    i.weight ? `${i.weight_est ? "≈" : ""}${num(i.weight, 2)} кг` : "", where,
+    i.stock !== "in" ? `<span class="st st-${i.stock || "unknown"}">${STOCK[i.stock] || STOCK.unknown}</span>` : ""].filter(Boolean);
+  const bd = badges(r);
   return `<li class="item" data-id="${esc(i.id)}">
     ${photo(i)}
-    <div class="t">${esc(i.title)}</div>
+    <div class="t">${esc(shortTitle(i))}</div>
     <div class="p">${i.price_old && !many ? `<s>${num(i.price_old)} ₴</s>` : ""}<b>${i.price == null ? "—" : (from ? "від " : "") + num(i.price) + " ₴"}</b>${i.ppk ? `<span>${num(i.ppk)} ₴/кг</span>` : `<span class="na">вага ?</span>`}</div>
-    <div class="meta">
-      <span class="mat-badge">${matDot(i.material)}${esc(MAT_NAME(i.material))}</span>
-      ${i.brand && !NOBRAND.test(i.brand) && !i.title.toLowerCase().includes(i.brand.toLowerCase()) ? `<span class="br-badge">${esc(i.brand)}</span>` : ""}
-      ${tg.map(t => `<span class="sub-badge">${esc(TAG_NAME[t])}</span>`).join("")}
-      ${i.weight ? `<span>${i.weight_est ? "≈" : ""}${num(i.weight, 2)} кг</span>` : ""}
-    </div>
-    <div class="meta">
-      <span class="shop">${many ? `<b class="nshops">${shops} ${plural(shops, "магазин", "магазини", "магазинів")}</b>` : hot ? `Hotline · ${i.offers} пропоз.` : shopName(i)}</span>
-      <span class="st st-${i.stock || "unknown"}">${STOCK[i.stock] || STOCK.unknown}</span>
-      ${badges(r)}
-    </div>
+    <div class="meta">${bits.join('<i class="sep">·</i>')}</div>
+    ${bd ? `<div class="meta tags">${bd}</div>` : ""}
   </li>`;
 }
 let ROWS = [];
