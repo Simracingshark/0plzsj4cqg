@@ -18,3 +18,4 @@
 | `PROGRESS.md` | статус и следующие шаги |
 | `DECISIONS.md` | решения и причины |
 | `CHANGELOG.md` | существенные изменения |
+| `graphify-out/GRAPH_REPORT.md` | граф кода и заметок (graphify; не в git). Вопросы: `G:\dev\graphify\bin\graphify.exe query "..."`, обновить: `/graphify . --update` |
