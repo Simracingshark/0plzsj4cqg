@@ -669,7 +669,7 @@ function initSettings() {
 }
 
 /* ---------- навигация ---------- */
-const TITLES = { home: "Філамент UA", list: "Каталог", calc: "Калькулятор", set: "Налаштування" };
+const TITLES = { home: "SpoolShark", list: "Каталог", calc: "Калькулятор", set: "Налаштування" };
 function go(v) {
   if (!TITLES[v]) v = "home";
   $$(".view").forEach(s => s.classList.toggle("active", s.id === "v-" + v));

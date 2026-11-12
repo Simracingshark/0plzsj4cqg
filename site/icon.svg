@@ -1,8 +1,17 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6b55f5"/><stop offset="1" stop-color="#c07bff"/></linearGradient></defs>
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6b55f5"/><stop offset="1" stop-color="#c07bff"/></linearGradient>
+    <linearGradient id="f" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#cfd3e6"/></linearGradient>
+    <clipPath id="c"><circle cx="256" cy="256" r="160"/></clipPath>
+  </defs>
   <rect width="512" height="512" rx="116" fill="#0e0f13"/>
+  <!-- катушка -->
   <circle cx="256" cy="256" r="160" fill="url(#g)"/>
-  <circle cx="256" cy="256" r="118" fill="none" stroke="#fff" stroke-opacity=".35" stroke-width="12"/>
-  <circle cx="256" cy="256" r="84" fill="none" stroke="#fff" stroke-opacity=".35" stroke-width="12"/>
+  <circle cx="256" cy="256" r="118" fill="none" stroke="#fff" stroke-opacity=".3" stroke-width="12"/>
+  <circle cx="256" cy="256" r="84" fill="none" stroke="#fff" stroke-opacity=".3" stroke-width="12"/>
   <circle cx="256" cy="256" r="44" fill="#0e0f13"/>
+  <!-- плавник акулы выныривает из катушки, под ним волна -->
+  <path d="M96 334 Q134 320 172 334 T248 334 T324 334 T400 334 V430 H96 Z" fill="#0e0f13" fill-opacity=".45" clip-path="url(#c)"/>
+  <path d="M160 334 C190 262 236 186 342 150 C304 204 292 270 318 334 Z" fill="url(#f)"/>
+  <path d="M110 334 Q148 320 186 334 T262 334 T338 334 T414 334" fill="none" stroke="#fff" stroke-width="10" stroke-linecap="round" stroke-opacity=".9" clip-path="url(#c)"/>
 </svg>

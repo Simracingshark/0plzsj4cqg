@@ -1,6 +1,6 @@
 {
-  "name": "Філамент UA — ціни на пластик",
-  "short_name": "Філамент",
+  "name": "SpoolShark — ціни на філамент",
+  "short_name": "SpoolShark",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

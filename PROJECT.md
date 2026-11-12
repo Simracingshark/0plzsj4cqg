@@ -30,7 +30,7 @@ scraper/sources/ld_listing.py   Product/Offer из ld+json на страница
 scraper/sources/prom_search.py  поиск Prom: JSON товаров в состоянии страницы, &page=N
 scraper/sources/monofilament.py MonoFilament: карточка mfil-catalog-card, активный вариант = вес
 site/                     PWA: index.html, app.js, style.css, sw.js, manifest, иконки
-tools/make_icons.py       генерит icon-192/512.png без библиотек
+tools/make_icons.py       старый генератор PNG (рисует прежнюю катушку); с 2026-11-12 icon-192/512.png — растр из icon.svg через canvas браузера, 512 с залитыми углами (maskable)
 .claude/launch.json       локальный сервер: python -m http.server 8765 -d site
 ```
 
