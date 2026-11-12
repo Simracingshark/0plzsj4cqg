@@ -38,16 +38,24 @@ const MAT_HUE = { "PLA": 265, "PLA+": 295, "PETG": 210, "ABS": 30, "ASA": 50, "T
   "PLA-CF": 0, "PETG-CF": 0, "PA-CF": 0, "PA": 330, "PC": 240, "PET": 175, "PVA": 100, "HIPS": 70, "PP": 120, "PEEK": 60, "PBT": 280, "Wood": 55 };
 function spool(m, size = 84) {
   const h = MAT_HUE[m], cf = m.endsWith("-CF") || h == null;
-  const c1 = cf ? "#5b5c63" : `oklch(.80 .13 ${h})`, c2 = cf ? "#2a2b30" : `oklch(.56 .16 ${h})`;
+  const c1 = cf ? "#6a6b73" : `oklch(.82 .13 ${h})`, c2 = cf ? "#3a3b41" : `oklch(.62 .16 ${h})`,
+    c3 = cf ? "#1f2024" : `oklch(.42 .14 ${h})`;
   const id = "sp" + m.replace(/\W/g, "");
+  // вид на три четверти: задняя щёчка, намотка-цилиндр со светом сверху, передняя щёчка с толщиной
   return `<svg class="spool" viewBox="0 0 120 100" width="${size}" aria-hidden="true">
-    <defs><linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:${c1}"/><stop offset="1" style="stop-color:${c2}"/></linearGradient>
-    <pattern id="${id}w" width="3" height="100" patternUnits="userSpaceOnUse"><rect width="1.2" height="100" fill="#000" opacity=".13"/></pattern></defs>
-    <ellipse cx="28" cy="50" rx="11" ry="40" class="fl-back"/>
-    <rect x="28" y="16" width="62" height="68" fill="url(#${id})"/><rect x="28" y="16" width="62" height="68" fill="url(#${id}w)"/>
-    <rect x="28" y="20" width="62" height="7" fill="#fff" opacity=".22"/>
-    <ellipse cx="90" cy="50" rx="13" ry="42" class="fl"/><ellipse cx="90" cy="50" rx="10" ry="36" class="fl-in"/>
-    <ellipse cx="91" cy="50" rx="4.5" ry="13" class="hub"/>
+    <defs><linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:${c3}"/>
+      <stop offset=".18" style="stop-color:${c1}"/><stop offset=".45" style="stop-color:${c2}"/><stop offset="1" style="stop-color:${c3}"/></linearGradient>
+    <radialGradient id="${id}f" cx=".35" cy=".3" r=".8"><stop offset="0" stop-color="#4b4c54"/><stop offset="1" stop-color="#18191d"/></radialGradient>
+    <pattern id="${id}w" width="2.6" height="100" patternUnits="userSpaceOnUse" patternTransform="skewY(-8)"><rect width="1" height="100" fill="#000" opacity=".16"/></pattern></defs>
+    <ellipse cx="34" cy="50" rx="19" ry="41" fill="#141519"/>
+    <rect x="34" y="14" width="40" height="72" fill="url(#${id})"/><rect x="34" y="14" width="40" height="72" fill="url(#${id}w)"/>
+    <rect x="34" y="21" width="40" height="4" fill="#fff" opacity=".28"/>
+    <ellipse cx="73" cy="50" rx="25" ry="44" fill="#101114"/>
+    <ellipse cx="78" cy="50" rx="25" ry="44" fill="url(#${id}f)"/>
+    <ellipse cx="78" cy="50" rx="20" ry="35" fill="url(#${id})" opacity=".6"/>
+    <ellipse cx="78" cy="50" rx="10" ry="17" fill="url(#${id}f)"/>
+    <ellipse cx="79" cy="50" rx="5" ry="9" fill="#060607"/>
+    <ellipse cx="78" cy="50" rx="24.4" ry="43.4" fill="none" stroke="#fff" stroke-opacity=".14"/>
   </svg>`;
 }
 
