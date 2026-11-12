@@ -40,6 +40,7 @@
     </button>
   </div>
   <div class="chips-scroll" id="mats"></div>
+  <div class="chips-scroll quick" id="quick"></div>
 </header>
 
 <main>
@@ -53,6 +54,9 @@
         <input id="hq" type="search" placeholder="Plexiwire PETG, Silk, чорний…" autocomplete="off" enterkeyhint="search">
       </label>
     </div>
+
+    <div class="sec-row" id="h-fav-h" hidden><h3 class="h">★ Обране</h3><button class="link-btn" id="h-fav-all">Усе →</button></div>
+    <div class="hscroll" id="h-fav" hidden></div>
 
     <div class="sec-row"><h3 class="h">Матеріали</h3><button class="link-btn" data-goto="list">Весь каталог →</button></div>
     <div class="mat-grid" id="h-mats"></div>
@@ -69,10 +73,12 @@
 
   <section id="v-list" class="view">
     <div class="active-f" id="active-f"></div>
+    <div class="pal" id="pal"></div>
     <div class="list-head">
       <span id="count" class="muted"></span>
-      <button class="link-btn" id="sort-btn"></button>
+      <label class="sort-sel">↕ <select id="sort" aria-label="Сортування"></select></label>
     </div>
+    <div id="browse" class="browse"></div>
     <ul id="list" class="list"></ul>
     <button id="more" class="btn soft wide" hidden>Показати ще</button>
   </section>

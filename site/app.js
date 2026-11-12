@@ -26,6 +26,15 @@ const COLORS = [
   [/мідн|медн|copper|бронз|bronze/i, "#b8723e"],
 ];
 const colorOf = s => { for (const [rx, c] of COLORS) if (rx.test(s)) return c; return null; };
+// семейства цветов для палитры (по тем же кружкам, что выше)
+const FAM = [["#1c1c20", "Чорний"], ["#f3f2ee", "Білий"], ["#8b8e95", "Сірий"], ["#c3c6cc", "Срібний"], ["#d63b3b", "Червоний"],
+  ["#f08a24", "Помаранчевий"], ["#f2c230", "Жовтий"], ["#d4a637", "Золотий"], ["#9ccc3d", "Салатовий"], ["#3f9d5a", "Зелений"],
+  ["#2bb3b1", "Бірюзовий"], ["#6cb8f0", "Блакитний"], ["#2f62d4", "Синій"], ["#8a55d6", "Фіолетовий"], ["#ee77ad", "Рожевий"],
+  ["#8a5a3b", "Коричневий"], ["#b89a6e", "Койот"], ["#e0cca4", "Бежевий"], ["#b8723e", "Мідний"], ["clear", "Прозорий"]];
+const FAM_NAME = Object.fromEntries(FAM), famRank = h => { const k = FAM.findIndex(f => f[0] === h); return k < 0 ? 99 : k; };
+const dot = (h, cls = "") => `<i class="cdot ${h === "clear" ? "clear" : ""} ${cls}" style="--c:${h && h !== "clear" ? h : "transparent"}"></i>`;
+// название цвета для шага «колір»: как у магазина, иначе семейство
+const cname = i => { const c = (i.color || "").trim(); return c ? c[0].toUpperCase() + c.slice(1).toLowerCase() : FAM_NAME[i.hx] || ""; };
 function swatch(i) {
   const c = colorOf((i.color || "") + " " + i.title);
   return c === "clear" ? `<i class="sw clear"></i>` : c ? `<i class="sw" style="--c:${c}"></i>` : `<i class="sw unknown"></i>`;
@@ -74,7 +83,7 @@ const BEST = new Map(), MST = new Map(), GROUPS = new Map();
 const favs = new Set(store.get("favs", []));
 const settings = Object.assign({ city: "", del: 0, free: 0 }, store.get("settings", {}));
 const F0 = () => ({ q: "", mat: "", tags: [], colors: [], brands: [], shop: "", w: [], stock: "in", fav: false, hot: true,
-  group: true, sale: false, ppkMin: "", ppkMax: "", pMin: "", pMax: "", sort: "ppk" });
+  group: true, sale: false, ppkMin: "", ppkMax: "", pMin: "", pMax: "", sort: "ppk", hex: [], cn: "", list: false });
 const F = Object.assign(F0(), store.get("f3", {}));
 const byId = new Map();
 
@@ -94,7 +103,7 @@ async function load() {
   try {
     DATA = await (await fetch("data/offers.json", { cache: "no-cache" })).json();
     const nm = Object.fromEntries(DATA.shops.map(s => [s.id, s.name]));  // имя магазина в файле не хранится
-    for (const i of DATA.items) i.shop ??= nm[i.src] || i.src;
+    for (const i of DATA.items) { i.shop ??= nm[i.src] || i.src; i.hx = colorOf((i.color || "") + " " + i.title); }
   } catch (e) {
     $("#list").innerHTML = `<li class="empty">Не вдалося завантажити дані.<br>${esc(e.message)}</li>`;
     return;
@@ -109,7 +118,7 @@ async function load() {
   $("#h-stats").innerHTML = [[DATA.items.length, "позицій"], [shops, "магазинів"], [brands, "брендів"]]
     .map(([n, t]) => `<div><b>${num(n)}</b><span>${t}</span></div>`).join("");
   fillShops();
-  renderHome(); renderMats(); render(); renderShops();
+  renderHome(); renderFav(); renderMats(); render(); renderShops();
 }
 // sw.js отдал цены из памяти телефона и докачал свежие — предлагаем обновить, не дёргая экран
 navigator.serviceWorker?.addEventListener("message", e => {
@@ -193,10 +202,40 @@ function renderHome() {
   const brands = countBy(inStock, "brand").filter(([b]) => !NOBRAND.test(b)).slice(0, 12);
   $("#h-brands").innerHTML = brands.map(([b, n]) => {
     const ppk = Math.min(...inStock.filter(i => i.brand === b && i.ppk && i.src !== "hotline").map(i => i.ppk));
-    return `<button class="brand-tile" data-brand="${esc(b)}"><span class="mono" style="--h:${[...b].reduce((a, c) => a + c.charCodeAt(0), 0) % 360}">${esc(b.slice(0, 2))}</span>
+    return `<button class="brand-tile" data-brand="${esc(b)}">${mono(b)}
       <span class="bt-n">${esc(b)}</span><span class="bt-c">${num(n)} · від ${isFinite(ppk) ? num(ppk) : "—"} ₴/кг</span></button>`;
   }).join("");
 }
+const mono = b => `<span class="mono" style="--h:${[...(b || "?")].reduce((a, c) => a + c.charCodeAt(0), 0) % 360}">${esc((b || "··").slice(0, 2))}</span>`;
+
+/* обране: одинаковые товары разных магазинов считаются одной катушкой */
+const famIds = i => (i.group ? GROUPS.get(i.group) || [i] : [i]).map(x => x.id);
+const isFav = i => famIds(i).some(x => favs.has(x));
+function favToggle(i) {
+  const on = isFav(i);
+  if (on) famIds(i).forEach(x => favs.delete(x)); else favs.add(i.id);
+  store.set("favs", [...favs]); syncWatch(); renderFav();
+  return !on;
+}
+// блок «Обране» на главной: по каждой катушке — лучшая цена сейчас (сначала в наличии)
+function renderFav() {
+  const seen = new Set(), out = [];
+  for (const id of favs) {
+    const i = byId.get(id);
+    if (!i || seen.has(i.group || i.id)) continue;
+    seen.add(i.group || i.id);
+    const xs = (i.group ? GROUPS.get(i.group) : [i]).filter(x => x.price != null);
+    out.push([xs.sort((a, b) => (a.stock !== "in") - (b.stock !== "in") || a.price - b.price)[0] || i, xs.length]);
+  }
+  $("#h-fav-h").hidden = $("#h-fav").hidden = !out.length;
+  $("#h-fav").innerHTML = out.map(([i, n]) => `<button class="deal-card" data-id="${esc(i.id)}">
+    ${photo(i, "ph big")}<span class="dc-t">${esc((i.brand && !NOBRAND.test(i.brand) && !i.title.toLowerCase().includes(i.brand.toLowerCase()) ? i.brand + " " : "") + shortTitle(i))}</span>
+    <span class="dc-p"><b>${num(i.price)} ₴</b>${i.ppk ? `<small>${num(i.ppk)} ₴/кг</small>` : ""}</span>
+    <span class="dc-s">${i.stock === "in" ? (n > 1 ? `${n} ${plural(n, "пропозиція", "пропозиції", "пропозицій")}` : shopName(i)) :
+      `<span class="st st-${i.stock || "unknown"}">${STOCK[i.stock] || STOCK.unknown}</span>`}</span></button>`).join("");
+}
+$("#h-fav").addEventListener("click", e => { const b = e.target.closest("[data-id]"); if (b) openItem(b.dataset.id); });
+$("#h-fav-all").onclick = () => openCatalog({ fav: true, stock: "all" });
 function openCatalog(patch) {
   Object.assign(F, F0(), { group: F.group, hot: F.hot, sort: F.sort }, patch);
   saveF(); renderMats(); render(); go("list");
@@ -216,7 +255,8 @@ function renderMats() {
   $("#mats").innerHTML = `<button class="chip ${F.mat ? "" : "on"}" data-m="">Усі</button>` +
     counts.map(([m, n]) => `<button class="chip ${F.mat === m ? "on" : ""}" data-m="${esc(m)}">${matDot(m)}${esc(MAT_NAME(m))} <small>${n}</small></button>`).join("");
   $("#q").value = F.q;
-  $("#sort-btn").textContent = "↕ " + SORTS[F.sort];
+  $("#sort").value = F.sort;
+  $("#quick").innerHTML = QUICK.map(([k, label, on]) => `<button class="chip ${on() ? "on" : ""}" data-q="${k}">${label}</button>`).join("");
   const n = activeFilters().length - (F.mat ? 1 : 0) - (F.q ? 1 : 0);
   $("#fcount").hidden = !n; $("#fcount").textContent = n;
   $("#active-f").innerHTML = activeFilters().map(([k, label]) => `<button class="af" data-k="${esc(k)}">${esc(label)} <span>✕</span></button>`).join("");
@@ -224,7 +264,28 @@ function renderMats() {
 $("#mats").addEventListener("click", e => {
   const b = e.target.closest("[data-m]");
   if (!b) return;
-  F.mat = b.dataset.m; saveF(); renderMats(); render();
+  F.mat = b.dataset.m; F.cn = ""; F.list = false; saveF(); renderMats(); render();
+});
+// быстрые кнопки: включаются одним касанием, без шторки фильтров
+const tagQ = t => [t, TAG_NAME[t], () => F.tags.includes(t), () => F.tags = toggleIn(F.tags, t)];
+const QUICK = [
+  ["fav", "★ Обране", () => F.fav, () => F.fav = !F.fav],
+  ["sale", "Знижка", () => F.sale, () => F.sale = !F.sale],
+  ["1kg", "1 кг", () => F.w.includes("1"), () => F.w = toggleIn(F.w, "1")],
+  tagQ("matte"), tagQ("silk"), tagQ("hs"),
+  ["order", "+ під замовлення", () => F.stock !== "in", () => F.stock = F.stock === "in" ? "avail" : "in"],
+];
+$("#quick").addEventListener("click", e => {
+  const b = e.target.closest("[data-q]");
+  if (!b) return;
+  QUICK.find(q => q[0] === b.dataset.q)[3]();
+  saveF(); renderMats(); render();
+});
+$("#pal").addEventListener("click", e => {
+  const b = e.target.closest("[data-hx]");
+  if (!b) return;
+  F.hex = toggleIn(F.hex, b.dataset.hx); F.cn = "";
+  saveF(); renderMats(); render();
 });
 let qTimer;
 $("#q").addEventListener("input", e => { clearTimeout(qTimer); qTimer = setTimeout(() => { F.q = e.target.value; saveF(); renderMats(); render(); }, 150); });
@@ -237,7 +298,9 @@ function activeFilters() {
   if (F.mat) a.push(["mat", MAT_NAME(F.mat)]);
   F.tags.forEach(t => a.push(["tags:" + t, TAG_NAME[t]]));
   F.colors.forEach(c => a.push(["colors:" + c, c]));
-  F.brands.forEach(b => a.push(["brands:" + b, b]));
+  F.hex.forEach(h => a.push(["hex:" + h, FAM_NAME[h] || h]));
+  F.brands.forEach(b => a.push(["brands:" + b, b === "—" ? "без бренду" : b]));
+  if (F.cn) a.push(["cn", F.cn]);
   F.w.forEach(w => a.push(["w:" + w, WEIGHTS.find(x => x[0] === w)?.[1] || w]));
   if (F.shop) a.push(["shop", F.shop]);
   if (F.stock !== "in") a.push(["stock", F.stock === "all" ? "з відсутніми" : "+ під замовлення"]);
@@ -258,10 +321,8 @@ $("#active-f").addEventListener("click", e => {
   else F[k] = F0()[k];
   saveF(); renderMats(); render();
 });
-$("#sort-btn").onclick = () => {
-  const ks = Object.keys(SORTS); F.sort = ks[(ks.indexOf(F.sort) + 1) % ks.length];
-  saveF(); renderMats(); render();
-};
+$("#sort").innerHTML = Object.entries(SORTS).map(([k, v]) => `<option value="${k}">${v}</option>`).join("");
+$("#sort").onchange = e => { F.sort = e.target.value; saveF(); renderMats(); render(); };
 
 /* шторка фильтров: всё применяется сразу, кнопка показывает число найденного */
 const toggleIn = (arr, v) => arr.includes(v) ? arr.filter(x => x !== v) : [...arr, v];
@@ -323,13 +384,16 @@ function filtered() {
   const words = F.q.toLowerCase().split(/\s+/).filter(Boolean);
   const wfn = F.w.map(k => WEIGHTS.find(x => x[0] === k)?.[2]).filter(Boolean);
   const lim = (v, lo, hi) => (lo === "" || (v != null && v >= +lo)) && (hi === "" || (v != null && v <= +hi));
+  const fk = new Set([...favs].map(id => { const i = byId.get(id); return i && (i.group || i.id); }));
+  const brandOk = i => F.brands.includes(i.brand) || (F.brands.includes("—") && (!i.brand || NOBRAND.test(i.brand)));
   return DATA.items.filter(i =>
     (!F.mat || i.material === F.mat) && stockOk(i) && (F.hot || i.src !== "hotline") &&
     (!F.tags.length || F.tags.every(t => (i.tags || []).includes(t))) &&
-    (!F.colors.length || F.colors.includes(i.color)) && (!F.brands.length || F.brands.includes(i.brand)) &&
+    (!F.colors.length || F.colors.includes(i.color)) && (!F.brands.length || brandOk(i)) &&
+    (!F.hex.length || F.hex.includes(i.hx)) && (!F.cn || cname(i) === F.cn) &&
     (!F.shop || i.shop === F.shop) && (!wfn.length || (i.weight && wfn.some(fn => fn(i.weight)))) &&
     lim(i.ppk, F.ppkMin, F.ppkMax) && lim(i.price, F.pMin, F.pMax) &&
-    (!F.sale || disc(i) > 0) && (!F.fav || favs.has(i.id)) &&
+    (!F.sale || disc(i) > 0) && (!F.fav || fk.has(i.group || i.id)) &&
     words.every(w => (i.title + " " + (i.color || "") + " " + i.shop + " " + (i.seller || "") + " " + (i.material || "") + " " + (i.brand || "")).toLowerCase().includes(w)));
 }
 // строки списка: одинаковые товары разных магазинов склеены, ведущий — самый дешёвый
@@ -361,12 +425,10 @@ function rows() {
 /* ---------- список ---------- */
 function badges(r) {
   // в списке одна метка, самая полезная; остальное видно в карточке
-  const i = r.lead, d = Math.max(...r.items.map(disc));
-  const fav = r.items.some(x => favs.has(x.id)) ? `<span class="tag fav">★</span>` : "";
-  const one = d > 0 ? `<span class="tag sale">−${d}%</span>` :
+  const d = Math.max(...r.items.map(disc));
+  return d > 0 ? `<span class="tag sale">−${d}%</span>` :
     r.items.some(x => x.drop) ? `<span class="tag drop">↓ ціна впала</span>` :
     r.items.some(x => x.new) ? `<span class="tag new">новинка</span>` : "";
-  return one + fav;
 }
 // название без повторов: материал, вес и «пластик для 3D принтера» уже видны отдельно
 const L = String.raw`[\p{L}\d]`, NOISE = new RegExp(String.raw`(?<!${L})(?:філамент|филамент|filament|пластик|plastic|нитка|пруток)(?!${L})|(?:для|до|for)\s+(?:3[DdДд][- ]?)?(?:друк\p{L}*|печат\p{L}*|принтер\p{L}*|printer\p{L}*)|3[DdДд][- ]?(?:принтер|printer)\p{L}*|(?<![\w-])Ø?\s*1[.,]75\s*(?:mm|мм)?(?![\d-])|(?<!${L})\d+(?:[.,]\d+)?\s*(?:kg|кг)(?!${L})|(?<!${L})\d+\s*(?:м|m)(?!${L})|вага:?|діаметр:?|\([^)]{40,}\)|\([^)\s]*\d[^)\s]*\)`, "giu");
@@ -391,7 +453,7 @@ function card(r) {
     i.ppk ? "" : `<span class="na">вага невідома</span>`;
   return `<li class="item" data-id="${esc(i.id)}">
     ${badges(r) ? `<div class="rib">${badges(r)}</div>` : ""}
-    ${photo(i)}
+    ${photo(i)}${favBtn(i)}
     <div class="info">
       <div class="t">${esc(br + shortTitle(i))}</div>
       <div class="ln">${spec}</div>
@@ -401,15 +463,82 @@ function card(r) {
     <div class="bot"><span class="big">${big}</span><span class="tot">${tot}</span></div>
   </li>`;
 }
+const favBtn = i => { const on = isFav(i); return `<button class="fv ${on ? "on" : ""}" data-fav="${esc(i.id)}" aria-label="${on ? "Прибрати з обраного" : "В обране"}">${on ? "★" : "☆"}</button>`; };
 let ROWS = [];
+// подбор по шагам: материал → плитки брендов → цвета бренда → магазины (карточка)
+const brandStepOn = () => F.mat && !F.brands.length && !F.q && !F.list && !F.fav && !F.cn && ROWS.length > 12;
 function render(reset = true) {
   if (reset) shown = PAGE;
   ROWS = rows();
   const n = ROWS.reduce((a, r) => a + r.items.length, 0);
-  $("#count").textContent = ROWS.length === n ? `Знайдено ${num(n)}` : `${num(ROWS.length)} товарів · ${num(n)} пропозицій`;
-  $("#list").innerHTML = ROWS.length ? ROWS.slice(0, shown).map(card).join("") : empty();
-  $("#more").hidden = ROWS.length <= shown;
+  $("#count").textContent = ROWS.length === n ? `Знайдено ${num(n)}` : `${num(ROWS.length)} ${plural(ROWS.length, "товар", "товари", "товарів")} · ${num(n)} ${plural(n, "пропозиція", "пропозиції", "пропозицій")}`;
+  renderPal();
+  const step = brandStepOn();
+  $("#browse").innerHTML = step ? brandStep() : browseBack() + (F.brands.length === 1 && !F.cn ? colorStep() : "");
+  $("#list").hidden = step;
+  $("#list").innerHTML = step ? "" : ROWS.length ? ROWS.slice(0, shown).map(card).join("") : empty();
+  $("#more").hidden = step || ROWS.length <= shown;
 }
+// палитра: кружки цветов, которые есть при текущих фильтрах
+function renderPal() {
+  const keep = F.hex; F.hex = [];
+  const c = new Map(); filtered().forEach(i => i.hx && c.set(i.hx, (c.get(i.hx) || 0) + 1));
+  F.hex = keep;
+  const fams = FAM.filter(([h]) => c.has(h) || F.hex.includes(h));
+  $("#pal").innerHTML = fams.length < 2 ? "" : fams.map(([h, name]) =>
+    `<button class="pdot ${F.hex.includes(h) ? "on" : ""}" data-hx="${h}" title="${name} · ${c.get(h) || 0}" aria-label="${name}">${dot(h)}</button>`).join("");
+}
+function brandStep() {
+  const m = new Map();
+  for (const r of ROWS) {
+    const b = r.lead.brand && !NOBRAND.test(r.lead.brand) ? r.lead.brand : "—";
+    const x = m.get(b) || m.set(b, { n: 0, cols: new Map(), min: Infinity }).get(b);
+    x.n++;
+    for (const i of r.items) {
+      if (i.hx) x.cols.set(i.hx, (x.cols.get(i.hx) || 0) + 1);
+      if (i.ppk && i.src !== "hotline" && i.stock === "in" && i.ppk < x.min) x.min = i.ppk;
+    }
+  }
+  const bs = [...m].sort((a, b) => (a[0] === "—") - (b[0] === "—") || b[1].n - a[1].n);
+  return `<div class="step-h"><b>${esc(MAT_NAME(F.mat))}: обери бренд</b><button class="link-btn" data-all>Усі ${num(ROWS.length)} списком →</button></div>
+    <div class="brand-grid">${bs.map(([b, x]) => `<button class="brand-tile bstep" data-sb="${esc(b)}">${mono(b === "—" ? "" : b)}
+      <span class="bt-n">${esc(b === "—" ? "Без бренду" : b)}</span>
+      <span class="bt-c">${isFinite(x.min) ? `від <b>${num(x.min)}</b> ₴/кг · ` : ""}${num(x.n)} ${plural(x.n, "товар", "товари", "товарів")}</span>
+      <span class="bt-dots">${[...x.cols].sort((a, b) => famRank(a[0]) - famRank(b[0])).slice(0, 10).map(([h]) => dot(h)).join("")}</span></button>`).join("")}</div>`;
+}
+function colorStep() {
+  const m = new Map();
+  for (const r of ROWS) {
+    const k = cname(r.lead);
+    if (!k) continue;
+    const x = m.get(k) || m.set(k, { hx: r.lead.hx, n: 0, min: Infinity }).get(k);
+    x.n++;
+    if (r.lead.ppk && r.lead.ppk < x.min) x.min = r.lead.ppk;
+  }
+  if (m.size < 2) return "";
+  const cs = [...m].sort((a, b) => famRank(a[1].hx) - famRank(b[1].hx) || a[0].localeCompare(b[0], "uk"));
+  return `<div class="step-h"><b>Обери колір</b><span class="muted small">${m.size} ${plural(m.size, "колір", "кольори", "кольорів")}</span></div>
+    <div class="cgrid">${cs.map(([k, x]) => `<button class="ctile" data-cn="${esc(k)}">${dot(x.hx, "big")}<span>${esc(k)}</span>
+      <b>${isFinite(x.min) ? num(x.min) + " ₴/кг" : "—"}</b></button>`).join("")}</div>`;
+}
+// «назад» на шаг выше
+function browseBack() {
+  if (!F.mat) return "";
+  const to = F.cn ? (F.brands.length === 1 ? (F.brands[0] === "—" ? "без бренду" : F.brands[0]) : "усі кольори") : F.brands.length || F.list ? "бренди " + MAT_NAME(F.mat) : "";
+  return to ? `<button class="link-btn back" data-back>← ${esc(to)}</button>` : "";
+}
+$("#browse").addEventListener("click", e => {
+  const b = e.target.closest("button");
+  if (!b) return;
+  const d = b.dataset;
+  if ("all" in d) F.list = true;
+  else if (d.sb) F.brands = [d.sb];
+  else if (d.cn) F.cn = d.cn;
+  else if ("back" in d) { if (F.cn) F.cn = ""; else { F.brands = []; F.list = false; } }
+  else return;
+  saveF(); renderMats(); render(); scrollTo(0, 0);
+  if (d.cn && ROWS.length === 1) openItem(ROWS[0].lead.id);  // один товар этого цвета — сразу магазины
+});
 // пусто, но есть товары под заказ / без наличия — предложить их показать
 function empty() {
   let hidden = 0;
@@ -420,7 +549,16 @@ function empty() {
 }
 $("#list").addEventListener("click", e => { if (e.target.closest("[data-show-all]")) { F.stock = "all"; fChanged(); } });
 $("#more").onclick = () => { shown += PAGE; render(false); };
-$("#list").addEventListener("click", e => { const li = e.target.closest("[data-id]"); if (li) openItem(li.dataset.id); });
+$("#list").addEventListener("click", e => {
+  const s = e.target.closest("[data-fav]");
+  if (s) {
+    const on = favToggle(byId.get(s.dataset.fav));
+    if (F.fav) render(false);
+    else { s.classList.toggle("on", on); s.textContent = on ? "★" : "☆"; }
+    return;
+  }
+  const li = e.target.closest("[data-id]"); if (li) openItem(li.dataset.id);
+});
 
 /* ---------- карточка товара ---------- */
 async function openItem(id) {
@@ -448,7 +586,7 @@ async function openItem(id) {
     ${gauge(i)}
     <div class="d-actions">
       <a class="btn" href="${esc(i.url)}" target="_blank" rel="noopener">${hot ? "Усі магазини на Hotline ↗" : "Відкрити в магазині ↗"}</a>
-      <button class="btn ghost" id="fav">${favs.has(i.id) ? "★ В обраному" : "☆ В обране"}</button>
+      <button class="btn ghost" id="fav">${isFav(i) ? "★ В обраному" : "☆ В обране"}</button>
       ${i.ppk ? `<button class="btn ghost" id="part">Порахувати деталь</button>` : `<button class="btn ghost" disabled>Вага невідома</button>`}
       ${i.price && i.weight ? `<button class="btn ghost" id="tocmp" style="grid-column:span 2">До порівняння з доставкою</button>` : ""}
     </div>
@@ -459,9 +597,7 @@ async function openItem(id) {
   if (!dlg.open) dlg.showModal();
   $("#sheet-body").scrollTop = 0; dlg.scrollTop = 0;
   $("#fav").onclick = e => {
-    favs.has(i.id) ? favs.delete(i.id) : favs.add(i.id);
-    store.set("favs", [...favs]); syncWatch();
-    e.target.textContent = favs.has(i.id) ? "★ В обраному" : "☆ В обране";
+    e.target.textContent = favToggle(i) ? "★ В обраному" : "☆ В обране";
     render(false);
   };
   if ($("#part")) $("#part").onclick = () => { $("#c-ppk").value = i.ppk; calc(); dlg.close(); go("calc"); };
@@ -675,12 +811,17 @@ function go(v) {
   $$(".view").forEach(s => s.classList.toggle("active", s.id === "v-" + v));
   $$(".tabs button").forEach(b => b.classList.toggle("on", b.dataset.v === v));
   $("#title").textContent = TITLES[v];
-  $("#search-row").hidden = $("#mats").hidden = v !== "list";
+  $("#search-row").hidden = $("#mats").hidden = $("#quick").hidden = v !== "list";
   $("#stats").hidden = v === "home";
   store.set("tab", v);
   scrollTo(0, 0);
 }
 $$(".tabs button").forEach(b => b.onclick = () => go(b.dataset.v));
+// листаешь вниз — заголовок прячется, поиск и кнопки остаются сверху
+addEventListener("scroll", () => {
+  const t = $(".top"), y = scrollY;
+  if (y > 140) t.classList.add("compact"); else if (y < 20) t.classList.remove("compact");
+}, { passive: true });
 
 const cs = store.get("calc", null);
 if (cs) { $("#c-g").value = cs.g; $("#c-ppk").value = cs.ppk; $("#c-waste").value = cs.waste; $("#k-p").value = cs.p; $("#k-w").value = cs.w; }

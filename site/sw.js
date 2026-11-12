@@ -1,5 +1,5 @@
 // Оболочка приложения — из кэша; данные — сначала сеть, без сети последняя копия.
-const CACHE = "ft-v14";
+const CACHE = "ft-v15";
 const WATCH = "ft-watch";  // обране и последние цены для уведомлений, не чистится при обновлении
 const SHELL = ["./", "index.html", "style.css", "app.js", "manifest.webmanifest", "icon.svg", "icon-192.png"];
 
