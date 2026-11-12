@@ -117,8 +117,8 @@ async function load() {
   $("#h-upd").textContent = "Ціни оновлено " + when;
   $("#h-stats").innerHTML = [[DATA.items.length, "позицій"], [shops, "магазинів"], [brands, "брендів"]]
     .map(([n, t]) => `<div><b>${num(n)}</b><span>${t}</span></div>`).join("");
-  fillShops();
-  renderHome(); renderFav(); renderMats(); render(); renderShops();
+  fillShops(); buildVocab();
+  renderHome(); renderFav(); renderMine(); renderMats(); render(); renderShops();
 }
 // sw.js отдал цены из памяти телефона и докачал свежие — предлагаем обновить, не дёргая экран
 navigator.serviceWorker?.addEventListener("message", e => {
@@ -234,7 +234,28 @@ function renderFav() {
     <span class="dc-s">${i.stock === "in" ? (n > 1 ? `${n} ${plural(n, "пропозиція", "пропозиції", "пропозицій")}` : shopName(i)) :
       `<span class="st st-${i.stock || "unknown"}">${STOCK[i.stock] || STOCK.unknown}</span>`}</span></button>`).join("");
 }
-$("#h-fav").addEventListener("click", e => { const b = e.target.closest("[data-id]"); if (b) openItem(b.dataset.id); });
+/* мои катушки дома: сколько осталось, и где сейчас дешевле такая же */
+const mine = store.get("mine", []);
+function saveMine() { store.set("mine", mine); renderMine(); }
+function renderMine() {
+  $("#h-mine-h").hidden = $("#h-mine").hidden = !mine.length;
+  $("#h-mine").innerHTML = mine.map((m, k) => {
+    const i = byId.get(m.id), full = (m.w || 1) * 1000, low = m.g <= 250;
+    const best = i && (i.group ? GROUPS.get(i.group) : [i]).filter(x => x.stock === "in" && x.price != null).sort((a, b) => a.price - b.price)[0];
+    return `<div class="mine ${low ? "low" : ""}">${dot(m.hx)}<div class="mi"><b>${esc(m.t)}</b>
+      <div class="bar"><i style="width:${Math.max(2, Math.min(100, m.g / full * 100))}%"></i></div>
+      <small>${low ? "Закінчується · " : ""}${best ? `<button class="link-btn" data-open="${esc(best.id)}">${low ? "купити" : "зараз"} від ${num(best.price)} ₴ · ${esc(best.shop)}</button>` : "зараз немає в наявності"}</small></div>
+      <label class="mg"><input type="number" inputmode="numeric" min="0" step="50" value="${m.g}" data-g="${k}" aria-label="Скільки лишилось, г"><i>г</i></label>
+      <button class="mx" data-rm="${k}" aria-label="Прибрати">✕</button></div>`;
+  }).join("");
+}
+$("#h-mine").addEventListener("change", e => { const k = e.target.dataset.g; if (k != null) { mine[k].g = Math.max(0, +e.target.value || 0); saveMine(); } });
+$("#h-mine").addEventListener("click", e => {
+  const b = e.target.closest("button");
+  if (b?.dataset.open) openItem(b.dataset.open);
+  else if (b?.dataset.rm) { mine.splice(+b.dataset.rm, 1); saveMine(); }
+});
+$("#h-fav").addEventListener("click",e => { const b = e.target.closest("[data-id]"); if (b) openItem(b.dataset.id); });
 $("#h-fav-all").onclick = () => openCatalog({ fav: true, stock: "all" });
 function openCatalog(patch) {
   Object.assign(F, F0(), { group: F.group, hot: F.hot, sort: F.sort }, patch);
@@ -246,7 +267,94 @@ $("#h-brands").addEventListener("click", e => { const b = e.target.closest("[dat
 $("#h-deals").addEventListener("click", e => { const b = e.target.closest("[data-id]"); if (b) openItem(b.dataset.id); });
 $("#h-allbrands").onclick = () => { go("list"); openFilters("f-brands"); };
 $$("[data-goto]").forEach(b => b.onclick = () => go(b.dataset.goto));
-$("#hq").addEventListener("keydown", e => { if (e.key === "Enter") { openCatalog({ q: e.target.value }); e.target.blur(); } });
+/* ---------- подсказки в поиске: слова узнаём как материал / бренд / цвет / тип / магазин ---------- */
+const MAT_ALIAS = { PLA: "пла", "PLA+": "пла+ plus плюс", PETG: "петг петж", ABS: "абс", TPU: "тпу flex флекс гнучк гибк", ASA: "аса",
+  PA: "нейлон nylon", PC: "полікарбонат поликарбонат", "PLA-CF": "карбон carbon", "PETG-CF": "карбон carbon", "PA-CF": "карбон carbon нейлон",
+  Wood: "дерево деревн", PVA: "пва", HIPS: "хіпс хипс", CoPET: "копет" };
+const FAM_ALIAS = { "#1c1c20": "black чорн черн", "#f3f2ee": "white біл бел", "#8b8e95": "grey gray сір сер графіт", "#c3c6cc": "silver срібл серебр",
+  "#d63b3b": "red червон красн", "#f08a24": "orange помаранч оранж", "#f2c230": "yellow жовт желт", "#d4a637": "gold золот",
+  "#9ccc3d": "lime салат лайм", "#3f9d5a": "green зелен олив хакі", "#2bb3b1": "turquoise teal бірюз бирюз", "#6cb8f0": "sky блакит голуб",
+  "#2f62d4": "blue син navy", "#8a55d6": "purple violet фіолет фиолет", "#ee77ad": "pink рожев розов", "#8a5a3b": "brown коричн",
+  "#b89a6e": "coyote койот", "#e0cca4": "beige беж", "#b8723e": "copper мідн медн", clear: "clear transparent прозор natural" };
+const TAG_ALIAS = { matte: "мат матов", silk: "шовк шелк", hs: "швидк скорост speed", glow: "glow светящ", marble: "мрамор marble",
+  transp: "transparent прозор", multi: "rainbow радуг веселк", metal: "metal метал" };
+const KIND = { mat: 0, brand: 1, hex: 2, tag: 3, shop: 4 };
+let VOCAB = [];
+function buildVocab() {
+  const toks = s => s.toLowerCase().split(/[\s/_-]+/).filter(Boolean);
+  const inS = DATA.items.filter(i => i.stock === "in");
+  const e = (k, v, label, alias, n) => ({ k, v, label, n, toks: toks(label + " " + (alias || "")) });
+  VOCAB = [
+    ...countBy(inS, "material").filter(([m]) => m !== "Other").map(([m, n]) => e("mat", m, m, MAT_ALIAS[m], n)),
+    ...countBy(inS, "brand").filter(([b]) => !NOBRAND.test(b)).map(([b, n]) => e("brand", b, b, "", n)),
+    ...countBy(inS, "hx").map(([h, n]) => e("hex", h, FAM_NAME[h] || h, FAM_ALIAS[h], n)),
+    ...Object.keys(TAG_NAME).map(t => e("tag", t, TAG_NAME[t], t + " " + (TAG_ALIAS[t] || ""), inS.filter(i => (i.tags || []).includes(t)).length)).filter(x => x.n),
+    ...countBy(inS.filter(i => i.src !== "hotline"), "shop").map(([s, n]) => e("shop", s, s, "", n)),
+  ];
+}
+// насколько слово похоже на запись: 3 — точно, 2 — начало, 1 — основа слова (чорн ← чорний)
+const fit = (e, w) => Math.max(0, ...e.toks.map(t => t === w ? 3 : t.startsWith(w) ? 2 : t.length >= 3 && w.startsWith(t) ? 1 : 0));
+const ranked = w => VOCAB.map(e => [e, fit(e, w)]).filter(x => x[1]).sort((a, b) => b[1] - a[1] || b[0].n - a[0].n).map(x => x[0]);
+const partsF = p => Object.fromEntries(Object.entries({ mat: p.mat, brands: p.brand && [p.brand], hex: p.hex && [p.hex], tags: p.tag && [p.tag], shop: p.shop }).filter(x => x[1]));
+const partsN = p => DATA.items.reduce((a, i) => a + (i.stock === "in" && (!p.mat || i.material === p.mat) && (!p.brand || i.brand === p.brand) &&
+  (!p.hex || i.hx === p.hex) && (!p.tag || (i.tags || []).includes(p.tag)) && (!p.shop || i.shop === p.shop)), 0);
+function suggest(q) {
+  const ws = q.toLowerCase().split(/\s+/).filter(Boolean);
+  if (q.trim().length < 2) return [];
+  const pre = {}, last = ws.pop();
+  for (const w of ws) {  // все слова, кроме последнего, должны узнаться
+    const e = ranked(w)[0];
+    if (!e) return [];
+    pre[e.k] = e.v;
+  }
+  const out = [], seen = new Set();
+  for (const e of ranked(last)) {
+    const p = { ...pre, [e.k]: e.v }, key = JSON.stringify(p);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const n = partsN(p);
+    if (n) out.push({ p, n });
+    if (out.length >= 6) break;
+  }
+  return out;
+}
+const SUG_ICON = { mat: v => matDot(v) || "🧵", brand: v => `<span class="s-mono">${esc(v.slice(0, 2))}</span>`, hex: v => dot(v), tag: () => "✨", shop: () => "🏪" };
+function partsLabel(p) {
+  return Object.keys(KIND).filter(k => p[k]).map(k => `<span class="s-p">${SUG_ICON[k](p[k])}${esc(k === "hex" ? FAM_NAME[p[k]] : k === "tag" ? TAG_NAME[p[k]] : p[k])}</span>`).join("");
+}
+// выпадашка под полем поиска; pick(f) — что делать с выбранным набором фильтров
+function wireSugg(input, box, pick) {
+  let list = [], t;
+  const draw = () => {
+    const q = input.value.trim();
+    list = suggest(q);
+    box.innerHTML = !q ? "" : list.map((s, k) => `<button type="button" data-s="${k}">${partsLabel(s.p)}<small>${num(s.n)} у наявності</small></button>`).join("") +
+      (q.length >= 2 ? `<button type="button" data-s="txt" class="s-txt">🔍 Шукати «${esc(q)}» у назвах</button>` : "");
+    box.hidden = !box.innerHTML;
+  };
+  const choose = s => { box.hidden = true; input.blur(); pick(s); };
+  input.addEventListener("input", () => { clearTimeout(t); t = setTimeout(draw, 120); });
+  input.addEventListener("focus", draw);
+  input.addEventListener("blur", () => setTimeout(() => box.hidden = true, 150));
+  input.addEventListener("keydown", e => {
+    if (e.key === "Escape") box.hidden = true;
+    if (e.key !== "Enter") return;
+    // Enter: если все слова узнаны — первая подсказка, иначе обычный поиск по тексту
+    const q = input.value.trim(), s = suggest(q);
+    choose(s.length ? partsF(s[0].p) : { q });
+  });
+  box.addEventListener("pointerdown", e => e.preventDefault());  // не терять фокус до клика
+  box.addEventListener("click", e => {
+    const b = e.target.closest("[data-s]");
+    if (b) choose(b.dataset.s === "txt" ? { q: input.value.trim() } : partsF(list[+b.dataset.s].p));
+  });
+}
+wireSugg($("#hq"), $("#sugg-h"), f => { $("#hq").value = ""; openCatalog(f); });
+wireSugg($("#q"), $("#sugg-l"), f => {
+  if (f.q === undefined) { $("#q").value = ""; Object.assign(F, { q: "", mat: "", cn: "", list: false, brands: [], hex: [], tags: [], shop: "" }, f); }
+  else F.q = f.q;
+  saveF(); renderMats(); render(); scrollTo(0, 0);
+});
 
 /* ---------- фильтры ---------- */
 function saveF() { store.set("f3", F); }
@@ -587,6 +695,7 @@ async function openItem(id) {
     <div class="d-actions">
       <a class="btn" href="${esc(i.url)}" target="_blank" rel="noopener">${hot ? "Усі магазини на Hotline ↗" : "Відкрити в магазині ↗"}</a>
       <button class="btn ghost" id="fav">${isFav(i) ? "★ В обраному" : "☆ В обране"}</button>
+      <button class="btn ghost" id="mine">🏠 У мене є</button>
       ${i.ppk ? `<button class="btn ghost" id="part">Порахувати деталь</button>` : `<button class="btn ghost" disabled>Вага невідома</button>`}
       ${i.price && i.weight ? `<button class="btn ghost" id="tocmp" style="grid-column:span 2">До порівняння з доставкою</button>` : ""}
     </div>
@@ -599,6 +708,11 @@ async function openItem(id) {
   $("#fav").onclick = e => {
     e.target.textContent = favToggle(i) ? "★ В обраному" : "☆ В обране";
     render(false);
+  };
+  $("#mine").onclick = e => {
+    const br = i.brand && !NOBRAND.test(i.brand) && !i.title.toLowerCase().includes(i.brand.toLowerCase()) ? i.brand + " " : "";
+    mine.push({ id: i.id, t: br + shortTitle(i), hx: i.hx, w: i.weight || 1, g: Math.round((i.weight || 1) * 1000) });
+    saveMine(); e.target.textContent = "✓ Додано в «Мої котушки»"; e.target.disabled = true;
   };
   if ($("#part")) $("#part").onclick = () => { $("#c-ppk").value = i.ppk; calc(); dlg.close(); go("calc"); };
   if ($("#tocmp")) $("#tocmp").onclick = () => {
