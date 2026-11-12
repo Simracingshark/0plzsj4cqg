@@ -124,7 +124,10 @@ function fillShops() {
 }
 // по каждому материалу: минимум, медиана, 90-й перцентиль ₴/кг (в наличии, без Hotline); группы одинаковых товаров
 function computeStats() {
-  BEST.clear(); MST.clear(); GROUPS.clear();
+  BEST.clear(); MST.clear(); GROUPS.clear(); STALE.clear();
+  for (const s of DATA.shops)
+    if (s.at && Date.now() - Date.parse(s.at) > 36e5 * 36)
+      STALE.set(s.id, new Date(s.at).toLocaleDateString("uk-UA", { day: "numeric", month: "short" }));
   const by = new Map();
   for (const i of DATA.items) {
     if (i.group) (GROUPS.get(i.group) || GROUPS.set(i.group, []).get(i.group)).push(i);
@@ -140,7 +143,10 @@ function computeStats() {
   }
 }
 const matDot = m => m in MAT_HUE ? `<i class="mdot" style="--h:${MAT_HUE[m]}"${m.endsWith("-CF") ? " data-cf" : ""}></i>` : "";
-const shopName = i => i.src === "hotline" ? `Hotline · ${i.offers} пропоз.` : esc(i.shop) + (i.seller ? ` · ${esc(i.seller)}` : "");
+// источник давно не обновлялся (Rozetka блокирует GitHub) — показываем дату цен
+const STALE = new Map();
+const shopName = i => (i.src === "hotline" ? `Hotline · ${i.offers} пропоз.` : esc(i.shop) + (i.seller ? ` · ${esc(i.seller)}` : "")) +
+  (STALE.has(i.src) ? ` <span class="stale">ціни від ${STALE.get(i.src)}</span>` : "");
 // на сколько процентов ₴/кг ниже медианы материала
 function deal(i) {
   const st = MST.get(i.material);
@@ -366,7 +372,7 @@ function card(r) {
   const from = many || (i.price_max && i.price_max !== i.price) ? "від " : "";
   const br = i.brand && !NOBRAND.test(i.brand) && !i.title.toLowerCase().includes(i.brand.toLowerCase()) ? i.brand + " " : "";
   const where = many ? `<b class="nshops">${shops} ${plural(shops, "магазин", "магазини", "магазинів")}</b>` :
-    hot ? `Hotline · ${i.offers} пропоз.` : esc(shopName(i));
+    shopName(i);
   const spec = [`${matDot(i.material)}${esc(MAT_NAME(i.material))}`,
     i.weight ? `${i.weight_est ? "≈" : ""}${num(i.weight, 2)} кг` : ""].filter(Boolean).join('<i class="sep">·</i>');
   const c = i.color ? colorOf(i.color + " " + i.title) : null;

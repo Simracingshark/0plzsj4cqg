@@ -520,3 +520,5 @@ select {
 
 .np-line { display: grid; gap: 2px; margin: 12px 0 4px; padding: 12px 14px; border-radius: 14px; background: var(--surface2); font-size: 13.5px; color: var(--muted); }
 .np-line b { color: var(--ink); font-size: 15px; }
+
+.stale { color: var(--warn); font-weight: 600; font-size: .92em; }

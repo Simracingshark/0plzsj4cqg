@@ -37,8 +37,6 @@
   {"id": "plastfill", "name": "PlastFill (Prom)", "type": "prom_seller",
    "url": "https://prom.ua/ua/c3804832-plastfill.html", "brand": "Plexiwire"},
 
-  {"id": "allo", "name": "Allo", "type": "ld_listing", "every_h": 11.5,
-   "urls": ["https://allo.ua/ua/plastik-dlja-3d-pechati/"], "page": "/p-{n}/"},
   {"id": "rozetka", "name": "Rozetka", "type": "ld_listing", "every_h": 11.5, "max_pages": 150,
    "urls": ["https://rozetka.com.ua/ua/rashodnie-materiali-dlya-3d-printerov/c4671751/"], "page": "/page={n}/"},
   {"id": "monofilament", "name": "MonoFilament", "type": "monofilament",
