@@ -2,6 +2,7 @@
 
 Запуск: python scraper/run.py [id_магазина ...]
 """
+import hashlib
 import json
 import re
 import pathlib
@@ -23,6 +24,14 @@ TYPES = {"hotline": hotline, "opencart": opencart, "prom_seller": prom_seller, "
 KEEP = ("id", "shop", "title", "brand", "material", "color", "weight", "price",
         "price_max", "offers", "stock", "ppk", "url", "weight_est", "seller",
         "image", "price_old", "tags", "group", "new", "drop")
+
+
+def compact(i):
+    """Для файла: без имени магазина (есть в shops[]), ключ склейки — короткий хэш."""
+    o = {k: v for k, v in i.items() if k != "shop"}
+    if o.get("group"):
+        o["group"] = hashlib.md5(o["group"].encode()).hexdigest()[:10]
+    return o
 
 
 def load(name, default):
@@ -63,6 +72,10 @@ def keep(o):
 def main(only):
     shops = json.loads((ROOT / "scraper" / "shops.json").read_text("utf-8"))
     prev = load("offers.json", {"items": [], "shops": []})
+    # в файле имя магазина не храним (его знает shops[]), возвращаем для старых записей
+    names = {s["id"]: s["name"] for s in shops}
+    for i in prev["items"]:
+        i.setdefault("shop", names.get(i.get("src"), i.get("src")))
     items, status = [], []
     for shop in shops:
         last = next((s for s in prev["shops"] if s["id"] == shop["id"]), {})
@@ -95,7 +108,7 @@ def main(only):
     DATA.mkdir(exist_ok=True)
     annotate(items, update_history(items))
     (DATA / "offers.json").write_text(json.dumps(
-        {"updated": now(), "shops": status, "items": items},
+        {"updated": now(), "shops": status, "items": [compact(i) for i in items]},
         ensure_ascii=False, separators=(",", ":")), "utf-8")
 
 

@@ -93,6 +93,8 @@ async function load() {
   $("#list").innerHTML = Array(6).fill('<li class="skel"></li>').join("");
   try {
     DATA = await (await fetch("data/offers.json", { cache: "no-cache" })).json();
+    const nm = Object.fromEntries(DATA.shops.map(s => [s.id, s.name]));  // имя магазина в файле не хранится
+    for (const i of DATA.items) i.shop ??= nm[i.src] || i.src;
   } catch (e) {
     $("#list").innerHTML = `<li class="empty">Не вдалося завантажити дані.<br>${esc(e.message)}</li>`;
     return;
@@ -109,6 +111,14 @@ async function load() {
   fillShops();
   renderHome(); renderMats(); render(); renderShops();
 }
+// sw.js отдал цены из памяти телефона и докачал свежие — предлагаем обновить, не дёргая экран
+navigator.serviceWorker?.addEventListener("message", e => {
+  if (e.data !== "data-updated" || $("#fresh")) return;
+  const b = document.createElement("button");
+  b.id = "fresh"; b.className = "fresh"; b.textContent = "Є свіжі ціни · оновити";
+  b.onclick = () => { b.remove(); load(); };
+  document.body.append(b);
+});
 async function history() {
   if (HIST) return HIST;
   try { HIST = await (await fetch("data/history.json", { cache: "no-cache" })).json(); } catch { HIST = {}; }
@@ -450,7 +460,7 @@ async function openItem(id) {
   $("#sheet-body").scrollTop = 0; dlg.scrollTop = 0;
   $("#fav").onclick = e => {
     favs.has(i.id) ? favs.delete(i.id) : favs.add(i.id);
-    store.set("favs", [...favs]);
+    store.set("favs", [...favs]); syncWatch();
     e.target.textContent = favs.has(i.id) ? "★ В обраному" : "☆ В обране";
     render(false);
   };
@@ -678,3 +688,36 @@ $$("#v-calc .panel:not(:last-child) input").forEach(el => el.addEventListener("i
 calc(); renderCmp(); initSettings(); go(store.get("tab", "home")); load();
 
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => { });
+
+/* ---------- уведомления про обране (проверяет sw.js; в фоне — только в установленном приложении) ---------- */
+function syncWatch() {
+  navigator.serviceWorker?.ready.then(r => r.active?.postMessage({ type: "watch", ids: [...favs] })).catch(() => {});
+}
+async function notifState() {
+  const el = $("#s-notif-st"), btn = $("#s-notif");
+  if (!("Notification" in window) || !navigator.serviceWorker) {
+    el.textContent = "Цей браузер не вміє сповіщення."; btn.hidden = true; return;
+  }
+  const on = Notification.permission === "granted";
+  btn.hidden = on;
+  if (Notification.permission === "denied") { el.textContent = "Сповіщення заборонені в налаштуваннях браузера."; btn.hidden = true; return; }
+  if (!on) { el.textContent = "Додай катушки в обране ☆ — напишу, коли подешевшають на 1%+ або знову з’являться в наявності."; return; }
+  let bg = false;
+  try {
+    const r = await navigator.serviceWorker.ready;
+    if (r.periodicSync) {
+      const st = await navigator.permissions.query({ name: "periodic-background-sync" });
+      if (st.state === "granted") { await r.periodicSync.register("prices", { minInterval: 6 * 36e5 }); bg = true; }
+    }
+  } catch { /* браузер без фоновых проверок */ }
+  el.textContent = `Увімкнено · стежу за ${favs.size} ${plural(favs.size, "товаром", "товарами", "товарами")} з обраного. ` +
+    (bg ? "Перевіряю у фоні приблизно раз на кілька годин." :
+      "Зараз перевіряю, коли відкриваєш сайт. Щоб і у фоні — встанови сайт як застосунок (Chrome → «Встановити»).");
+}
+$("#s-notif").onclick = async () => { await Notification.requestPermission(); notifState(); syncWatch(); };
+notifState(); syncWatch();
+// клик по уведомлению открывает товар
+addEventListener("load", () => {
+  const m = location.hash.match(/^#item=(.+)$/);
+  if (m) setTimeout(() => openItem(decodeURIComponent(m[1])), 1500);
+});

@@ -223,14 +223,43 @@ _STOP = set("""пластик пластику філамент філамент
 на котушці катушке spool with з і и та the of оригінальний оригинальный""".split())
 
 
+# укр/рус основы цвета и оттенка -> одно английское слово, чтобы «Армійський зелений» = «Army Green»
+_TR = {
+    "чорн": "black", "черн": "black", "біл": "white", "бел": "white", "сір": "grey", "сер": "grey", "gray": "grey",
+    "срібл": "silver", "серебр": "silver", "червон": "red", "красн": "red", "син": "blue", "блакит": "lightblue",
+    "голуб": "lightblue", "зелен": "green", "жовт": "yellow", "желт": "yellow", "помаранч": "orange", "оранж": "orange",
+    "фіолет": "purple", "фиолет": "purple", "violet": "purple", "рожев": "pink", "розов": "pink", "коричн": "brown",
+    "прозор": "transparent", "clear": "transparent", "натурал": "natural", "золот": "gold", "беж": "beige",
+    "хакі": "khaki", "хаки": "khaki", "оливк": "olive", "олив": "olive", "армійськ": "army", "армейск": "army",
+    "камуфляж": "camouflage", "темн": "dark", "світл": "light", "светл": "light", "мармур": "marble", "мрамор": "marble",
+    "матов": "matte", "шовк": "silk", "шелк": "silk", "антрацит": "anthracite", "графіт": "graphite", "графит": "graphite",
+    "бірюз": "turquoise", "бирюз": "turquoise", "небесн": "sky", "морськ": "sea", "лаванд": "lavender", "бордов": "burgundy",
+    "мідн": "copper", "медн": "copper", "бронз": "bronze", "тілесн": "skin", "телесн": "skin", "койот": "coyote",
+    "пісочн": "sand", "песочн": "sand", "кремов": "cream", "мох": "moss", "лимон": "lemon", "салатов": "lime",
+    "м'ят": "mint", "мят": "mint", "неон": "neon", "флуоресц": "fluo", "fluorescent": "fluo", "світиться": "glow",
+    "светящ": "glow", "люмінес": "glow",
+}
+_GSTOP = _STOP | set("""пла петг абс тпу аса pla petg abs tpu asa pla+ petg+ abs+ з колір цвет color colour
+котушка катушка котушки катушки спул refill рефіл рефил""".split())
+
+
+def _tok(w):
+    for k, v in _TR.items():
+        if w.startswith(k):
+            return v
+    return w
+
+
 def group_key(o):
-    """Ключ склейки: бренд, материал, вес и набор значимых слов названия.
-    Склеиваем только точное совпадение, чтобы не смешать разные цвета."""
-    b, w = o.get("brand"), o.get("weight")
-    if not b or not w or o["material"] == "Other":
+    """Ключ склейки одинаковых катушек разных магазинов: бренд, материал, вес, подтипы и
+    слова названия (цвета переведены в английские). Без бренда не склеиваем."""
+    b, w, m = o.get("brand"), o.get("weight"), o.get("material")
+    if not b or not w or not m or m == "Other" or re.search(r"без бренд|no ?name|noname", b, re.I):
         return None
-    words = re.findall(r"[a-zа-яіїєґ]+", o["title"].lower().replace(b.lower(), " "))
-    sig = sorted({x for x in words if x not in _STOP and len(x) > 1})
+    words = re.findall(r"[a-zа-яіїєґ'+]+", o["title"].lower().replace(b.lower(), " "))
+    sig = sorted({_tok(x) for x in words if x not in _GSTOP and len(x) > 1 and x != m.lower()})
     if not sig:
         return None
-    return "|".join([b.lower(), o["material"], f"{w:g}"] + sig)[:120]
+    tg = ",".join(sorted(t for t in (o.get("tags") or []) if t != "refill"))
+    return "|".join([b.lower(), m, f"{w:g}", tg] + sig)[:160]
+
