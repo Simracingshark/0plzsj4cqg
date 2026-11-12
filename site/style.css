@@ -498,13 +498,22 @@ select {
 .spool { width: 104px; height: 86px; stroke: none; }
 .br-badge { font-size: 12px; font-weight: 800; color: var(--accent2); }
 
-/* v4: спокойная строка каталога */
-.item { gap: 4px 12px; padding: 14px 14px; }
-.item .t { font-size: 15px; font-weight: 650; line-height: 1.32; }
-.item .meta { gap: 0 6px; font-size: 13px; color: var(--muted); }
-.item .meta .sep { font-style: normal; opacity: .6; }
-.item .meta.tags { grid-column: 2 / span 2; margin-top: 2px; }
-.item .meta + .meta { grid-column: 2 / span 2; }
-.item .p span { background: none; padding: 0; margin-top: 2px; font-weight: 600; color: var(--accent); }
-.item .p span.na { background: none; color: var(--muted); }
+/* v5: карточка каталога — строки по одному факту, внизу крупно ₴/кг */
+.item { position: relative; grid-template-columns: 76px 1fr; gap: 0 14px; align-items: start; padding: 16px; }
+.item > .ph { grid-row: 1; width: 76px; height: 76px; align-self: start; }
+.item .info { grid-column: 2; display: grid; grid-template-columns: minmax(0, 1fr); gap: 3px; min-width: 0; }
+.item .info > * { grid-column: 1; grid-row: auto; }
+.item .t { font-size: 15.5px; font-weight: 700; line-height: 1.3; -webkit-line-clamp: 2; }
+.item .ln { display: flex; flex-wrap: wrap; align-items: center; gap: 0 6px; font-size: 13.5px; color: var(--muted); }
+.item .sep { font-style: normal; opacity: .6; }
 .item .nshops { color: var(--accent); font-weight: 650; }
+.item .cdot { width: 12px; height: 12px; border-radius: 50%; background: var(--c); box-shadow: inset 0 0 0 1px rgb(127 127 127 / .45); flex: none; }
+.item .cdot.clear { background: repeating-conic-gradient(var(--surface2) 0 25%, var(--surface) 0 50%) 0 0 / 6px 6px; }
+.item .bot { grid-column: 1 / -1; display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+  margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); }
+.item .big { font-size: 24px; font-weight: 800; letter-spacing: -.02em; color: var(--ink); white-space: nowrap; }
+.item .big small { font-size: 13px; font-weight: 600; color: var(--muted); letter-spacing: 0; }
+.item .tot { font-size: 13px; color: var(--muted); text-align: right; }
+.item .tot s { opacity: .8; }
+.item .rib { position: absolute; top: -1px; right: 14px; display: flex; gap: 4px; }
+.item .rib .tag { border-radius: 0 0 8px 8px; font-size: 11.5px; }

@@ -358,21 +358,29 @@ function shortTitle(i) {
   return t.length >= 6 ? t : i.title;
 }
 function card(r) {
+  // как у kotushkin по смыслу: одна строка = один факт, внизу крупно ₴/кг
   const i = r.lead, hot = i.src === "hotline", many = r.items.length > 1;
   const shops = new Set(r.items.map(x => x.shop + (x.seller || ""))).size;
-  const from = many || (i.price_max && i.price_max !== i.price);
+  const from = many || (i.price_max && i.price_max !== i.price) ? "від " : "";
+  const br = i.brand && !NOBRAND.test(i.brand) && !i.title.toLowerCase().includes(i.brand.toLowerCase()) ? i.brand + " " : "";
   const where = many ? `<b class="nshops">${shops} ${plural(shops, "магазин", "магазини", "магазинів")}</b>` :
     hot ? `Hotline · ${i.offers} пропоз.` : esc(shopName(i));
-  const bits = [`${matDot(i.material)}${esc(MAT_NAME(i.material))}`,
-    i.weight ? `${i.weight_est ? "≈" : ""}${num(i.weight, 2)} кг` : "", where,
-    i.stock !== "in" ? `<span class="st st-${i.stock || "unknown"}">${STOCK[i.stock] || STOCK.unknown}</span>` : ""].filter(Boolean);
-  const bd = badges(r);
+  const spec = [`${matDot(i.material)}${esc(MAT_NAME(i.material))}`,
+    i.weight ? `${i.weight_est ? "≈" : ""}${num(i.weight, 2)} кг` : ""].filter(Boolean).join('<i class="sep">·</i>');
+  const c = i.color ? colorOf(i.color + " " + i.title) : null;
+  const big = i.ppk ? `${from}${num(i.ppk)}<small> ₴/кг</small>` : i.price == null ? "—" : `${from}${num(i.price)}<small> ₴</small>`;
+  const tot = i.ppk && i.price != null ? `${i.price_old && !many ? `<s>${num(i.price_old)}</s> ` : ""}${from}${num(i.price)} ₴${i.weight ? ` за ${num(i.weight, 2)} кг` : ""}` :
+    i.ppk ? "" : `<span class="na">вага невідома</span>`;
   return `<li class="item" data-id="${esc(i.id)}">
+    ${badges(r) ? `<div class="rib">${badges(r)}</div>` : ""}
     ${photo(i)}
-    <div class="t">${esc(shortTitle(i))}</div>
-    <div class="p">${i.price_old && !many ? `<s>${num(i.price_old)} ₴</s>` : ""}<b>${i.price == null ? "—" : (from ? "від " : "") + num(i.price) + " ₴"}</b>${i.ppk ? `<span>${num(i.ppk)} ₴/кг</span>` : `<span class="na">вага ?</span>`}</div>
-    <div class="meta">${bits.join('<i class="sep">·</i>')}</div>
-    ${bd ? `<div class="meta tags">${bd}</div>` : ""}
+    <div class="info">
+      <div class="t">${esc(br + shortTitle(i))}</div>
+      <div class="ln">${spec}</div>
+      ${i.color ? `<div class="ln"><i class="cdot${c === "clear" ? " clear" : ""}" style="--c:${c && c !== "clear" ? c : "transparent"}"></i>${esc(i.color)}</div>` : ""}
+      <div class="ln">${where}${i.stock !== "in" ? `<i class="sep">·</i><span class="st st-${i.stock || "unknown"}">${STOCK[i.stock] || STOCK.unknown}</span>` : ""}</div>
+    </div>
+    <div class="bot"><span class="big">${big}</span><span class="tot">${tot}</span></div>
   </li>`;
 }
 let ROWS = [];
