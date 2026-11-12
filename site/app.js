@@ -38,26 +38,28 @@ const MAT_HUE = { "PLA": 265, "PLA+": 295, "PETG": 210, "ABS": 30, "ASA": 50, "T
   "PLA-CF": 0, "PETG-CF": 0, "PA-CF": 0, "PA": 330, "PC": 240, "PET": 175, "PVA": 100, "HIPS": 70, "PP": 120, "PEEK": 60, "PBT": 280, "Wood": 55 };
 function spool(m, size = 84) {
   const h = MAT_HUE[m], cf = m.endsWith("-CF") || h == null;
-  const c1 = cf ? "#6a6b73" : `oklch(.82 .13 ${h})`, c2 = cf ? "#3a3b41" : `oklch(.62 .16 ${h})`,
-    c3 = cf ? "#1f2024" : `oklch(.42 .14 ${h})`;
-  const id = "sp" + m.replace(/\W/g, "");
-  // вид на три четверти: задняя щёчка, намотка-цилиндр со светом сверху, передняя щёчка с толщиной
+  const c1 = cf ? "#7a7b83" : `oklch(.84 .12 ${h})`, c2 = cf ? "#45464d" : `oklch(.64 .16 ${h})`,
+    c3 = cf ? "#222328" : `oklch(.44 .14 ${h})`;
+  const id = "sp" + m.replace(/\W/g, "") + (++spool.n);  // id уникален: градиент из скрытого блока не рисуется
+  // катушка лежит, смотрим сверху-сбоку: нижняя щёчка, цилиндр намотки, верхняя щёчка с окном и втулкой
   return `<svg class="spool" viewBox="0 0 120 100" width="${size}" aria-hidden="true">
-    <defs><linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:${c3}"/>
-      <stop offset=".18" style="stop-color:${c1}"/><stop offset=".45" style="stop-color:${c2}"/><stop offset="1" style="stop-color:${c3}"/></linearGradient>
-    <radialGradient id="${id}f" cx=".35" cy=".3" r=".8"><stop offset="0" stop-color="#4b4c54"/><stop offset="1" stop-color="#18191d"/></radialGradient>
-    <pattern id="${id}w" width="2.6" height="100" patternUnits="userSpaceOnUse" patternTransform="skewY(-8)"><rect width="1" height="100" fill="#000" opacity=".16"/></pattern></defs>
-    <ellipse cx="34" cy="50" rx="19" ry="41" fill="#141519"/>
-    <rect x="34" y="14" width="40" height="72" fill="url(#${id})"/><rect x="34" y="14" width="40" height="72" fill="url(#${id}w)"/>
-    <rect x="34" y="21" width="40" height="4" fill="#fff" opacity=".28"/>
-    <ellipse cx="73" cy="50" rx="25" ry="44" fill="#101114"/>
-    <ellipse cx="78" cy="50" rx="25" ry="44" fill="url(#${id}f)"/>
-    <ellipse cx="78" cy="50" rx="20" ry="35" fill="url(#${id})" opacity=".6"/>
-    <ellipse cx="78" cy="50" rx="10" ry="17" fill="url(#${id}f)"/>
-    <ellipse cx="79" cy="50" rx="5" ry="9" fill="#060607"/>
-    <ellipse cx="78" cy="50" rx="24.4" ry="43.4" fill="none" stroke="#fff" stroke-opacity=".14"/>
+    <defs><linearGradient id="${id}" x1="0" y1="0" x2="1" y2="0"><stop offset="0" style="stop-color:${c3}"/>
+      <stop offset=".3" style="stop-color:${c1}"/><stop offset=".6" style="stop-color:${c2}"/><stop offset="1" style="stop-color:${c3}"/></linearGradient>
+    <linearGradient id="${id}f" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#55565e"/><stop offset="1" stop-color="#1c1d22"/></linearGradient>
+    <pattern id="${id}w" width="120" height="3" patternUnits="userSpaceOnUse"><rect width="120" height="1.1" fill="#000" opacity=".14"/></pattern></defs>
+    <ellipse cx="60" cy="80" rx="46" ry="15" fill="#0d0e11"/>
+    <ellipse cx="60" cy="77" rx="46" ry="15" fill="url(#${id}f)"/>
+    <path d="M22 30v46a38 12.5 0 0 0 76 0V30z" fill="url(#${id})"/><path d="M22 30v46a38 12.5 0 0 0 76 0V30z" fill="url(#${id}w)"/>
+    <ellipse cx="60" cy="27" rx="46" ry="15" fill="#0d0e11"/>
+    <ellipse cx="60" cy="24" rx="46" ry="15" fill="url(#${id}f)"/>
+    <ellipse cx="60" cy="24" rx="37" ry="11.5" fill="url(#${id})" opacity=".75"/>
+    <ellipse cx="60" cy="24" rx="17" ry="5.6" fill="url(#${id}f)"/>
+    <ellipse cx="60" cy="24.6" rx="8" ry="2.7" fill="#050506"/>
+    <ellipse cx="60" cy="24" rx="45.3" ry="14.4" fill="none" stroke="#fff" stroke-opacity=".16"/>
   </svg>`;
 }
+
+spool.n = 0;
 
 const TAG_NAME = { matte: "Matte", silk: "Silk", hs: "High Speed", cf: "Карбон CF", gf: "Скловолокно GF", glow: "Світиться",
   marble: "Мармур", transp: "Прозорий", multi: "Багатоколірний", metal: "Металік", refill: "Рефіл" };
@@ -425,6 +427,8 @@ async function openItem(id) {
       <div class="offers">${offers.map(o => `<a class="offer ${o.id === i.id ? "cur" : ""}" href="${esc(o.url)}" target="_blank" rel="noopener">
         <span class="o-s"><b>${shopName(o)}</b><small class="st st-${o.stock}">${STOCK[o.stock] || ""}</small></span>
         <span class="o-p"><b>${num(o.price)} ₴</b><small>${o.ppk ? num(o.ppk) + " ₴/кг" : ""}</small></span><span class="o-go">↗</span></a>`).join("")}</div>` : ""}
+    ${!hot && i.price && i.weight ? `<div class="np-line" id="npline">${settings.cityRef ? "Рахую доставку…" :
+      `Вкажи місто в Налаштуваннях — покажу ціну з доставкою Новою Поштою.`}</div>` : ""}
     ${gauge(i)}
     <div class="d-actions">
       <a class="btn" href="${esc(i.url)}" target="_blank" rel="noopener">${hot ? "Усі магазини на Hotline ↗" : "Відкрити в магазині ↗"}</a>
@@ -450,6 +454,11 @@ async function openItem(id) {
     saveCmp(); renderCmp(); dlg.close(); go("calc");
   };
   $$("#sheet-body .alt").forEach(a => a.onclick = () => openItem(a.dataset.id));
+  if ($("#npline") && settings.cityRef) (freeShip(i.price) ? Promise.resolve(0) : npFetch(i.weight, i.price)).then(d => {
+    if (!$("#npline")) return;
+    $("#npline").innerHTML = d == null ? "Нова Пошта не відповіла." : `<span>🚚 Доставка до ${esc(settings.city.split(",")[0])} ${d ? "≈ " + num(d) + " ₴" : "безкоштовна"}</span>
+      <b>разом ${num(i.price + d)} ₴ · ${num((i.price + d) / i.weight)} ₴/кг</b>`;
+  });
   drawChart($("#chart"), (await history())[i.id] || []);
 }
 /* шкала: где эта цена за кг среди предложений материала (мин … 90-й перцентиль) */
@@ -535,15 +544,48 @@ function calc() {
   $("#k-out").innerHTML = kw > 0 ? `<b>${num(p / kw)} ₴/кг</b><small>${num(p / kw / 1000, 3)} ₴ за грам</small>` : "<b>—</b>";
   store.set("calc", { g: $("#c-g").value, ppk: $("#c-ppk").value, waste: $("#c-waste").value, p: $("#k-p").value, w: $("#k-w").value });
 }
+/* ---------- Нова Пошта: тариф по API без ключа (поиск города и getDocumentPrice) ---------- */
+const NP_URL = "https://api.novaposhta.ua/v2.0/json/", KYIV = "8d5a980d-391c-11dd-90d9-001a92567626";
+const npCache = store.get("np", {}), npWait = new Map();
+async function npCall(model, method, props) {
+  const r = await fetch(NP_URL, { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ apiKey: "", modelName: model, calledMethod: method, methodProperties: props }) });
+  const d = await r.json();
+  if (!d.success) throw new Error((d.errors || [])[0] || "NP");
+  return d.data;
+}
+// отправитель — Київ (большинство магазинов там; точный город магазина не знаем), вес +0,2 кг упаковки,
+// шаг 0,5 кг и 500 ₴ оценки; кэш на месяц
+function npKey(w, cost) {
+  return `${new Date().toISOString().slice(0, 7)}|${settings.cityRef}|${Math.ceil((w + .2) * 2) / 2}|${Math.max(500, Math.ceil(cost / 500) * 500)}`;
+}
+const npCost = (w, cost) => settings.cityRef && w > 0 ? npCache[npKey(w, cost)] ?? null : null;
+function npFetch(w, cost) {
+  if (!settings.cityRef || !(w > 0)) return Promise.resolve(null);
+  const k = npKey(w, cost);
+  if (k in npCache) return Promise.resolve(npCache[k]);
+  if (!npWait.has(k)) {
+    const [, , kg, c] = k.split("|");
+    npWait.set(k, npCall("InternetDocumentGeneral", "getDocumentPrice", { CitySender: KYIV, CityRecipient: settings.cityRef,
+      Weight: kg, ServiceType: "WarehouseWarehouse", Cost: c, CargoType: "Parcel", SeatsAmount: "1" })
+      .then(d => { npCache[k] = +d[0].Cost; store.set("np", npCache); return npCache[k]; }).catch(() => null));
+  }
+  return npWait.get(k);
+}
+const freeShip = price => settings.free > 0 && price >= settings.free;
+
 let cmpRows = store.get("cmp", [{ n: "Магазин 1", p: 650, w: 1, d: "" }, { n: "Магазин 2", p: 1700, w: 3, d: "" }]);
 const saveCmp = () => store.set("cmp", cmpRows);
 function cmpCalc(r) {
-  const del = r.d === "" ? (settings.free > 0 && +r.p >= settings.free ? 0 : +settings.del || 0) : +r.d;
+  const auto = freeShip(+r.p) ? 0 : npCost(+r.w, +r.p);
+  const del = r.d === "" ? auto ?? 0 : +r.d;
   const total = +r.p + del;
   return { total, del, ppk: r.w > 0 ? total / r.w : null };
 }
 function renderCmp() {
   const res = cmpRows.map(cmpCalc);
+  const miss = cmpRows.filter(r => r.d === "" && !freeShip(+r.p) && settings.cityRef && +r.w > 0 && npCost(+r.w, +r.p) == null);
+  if (miss.length) Promise.all(miss.map(r => npFetch(+r.w, +r.p))).then(v => { if (v.some(x => x != null)) renderCmp(); });
   const best = Math.min(...res.map(r => r.ppk ?? Infinity));
   $("#cmp").innerHTML = cmpRows.map((r, k) => `<div class="cmp-row ${res[k].ppk === best && isFinite(best) && cmpRows.length > 1 ? "best" : ""}">
     <div class="r1"><input data-k="${k}" data-f="n" value="${esc(r.n)}" aria-label="Назва"><button class="x" data-del="${k}" aria-label="Видалити">✕</button></div>
@@ -575,12 +617,39 @@ function renderShops() {
     <span class="n">${esc(s.name)}${s.ok ? "" : `<span class="err">помилка: ${esc(s.error || "")}</span>`}</span>
     <span class="c">${num(s.count)} · ${s.at ? new Date(s.at).toLocaleString("uk-UA", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "—"}</span></li>`).join("");
 }
+function npInfo() {
+  if (!settings.cityRef) { $("#s-np").textContent = "Обери місто зі списку — доставку Новою Поштою порахую сам."; return; }
+  Promise.all([npFetch(1, 600), npFetch(3, 1500)]).then(([a, b]) => {
+    $("#s-np").textContent = a == null ? "Нова Пошта не відповіла, спробую пізніше." :
+      `Нова Пошта з Києва, відділення → відділення: 1 кг ≈ ${num(a)} ₴, 3 кг ≈ ${num(b)} ₴. Враховується в картці товару й порівнянні.`;
+  });
+}
 function initSettings() {
-  $("#s-city").value = settings.city; $("#s-del").value = settings.del || ""; $("#s-free").value = settings.free || "";
-  ["#s-city", "#s-del", "#s-free"].forEach(s => $(s).addEventListener("input", () => {
-    settings.city = $("#s-city").value; settings.del = +$("#s-del").value || 0; settings.free = +$("#s-free").value || 0;
-    store.set("settings", settings); renderCmp();
-  }));
+  $("#s-city").value = settings.city; $("#s-free").value = settings.free || "";
+  let t, found = [];
+  $("#s-city").addEventListener("input", e => {
+    const q = e.target.value.trim(), hit = found.find(c => c.label === q);
+    if (hit) {
+      Object.assign(settings, { city: hit.label, cityRef: hit.ref }); store.set("settings", settings); npInfo(); renderCmp();
+      return;
+    }
+    clearTimeout(t);
+    if (q.length < 2) return;
+    t = setTimeout(async () => {
+      try {
+        const d = await npCall("Address", "getCities", { FindByString: q, Limit: "8" });
+        found = d.map(c => ({ label: c.Description + (c.AreaDescription && !c.Description.includes("обл") ? `, ${c.AreaDescription} обл.` : ""), ref: c.Ref }));
+        $("#s-cities").innerHTML = found.map(c => `<option value="${esc(c.label)}">`).join("");
+      } catch { /* без сети — просто нет подсказок */ }
+    }, 300);
+  });
+  $("#s-free").addEventListener("input", () => { settings.free = +$("#s-free").value || 0; store.set("settings", settings); renderCmp(); });
+  // город вписан руками в прошлой версии — ищем его у НП по точному названию
+  if (settings.city && !settings.cityRef) npCall("Address", "getCities", { FindByString: settings.city.trim(), Limit: "8" }).then(d => {
+    const c = d.find(x => x.Description.toLowerCase() === settings.city.trim().toLowerCase());
+    if (c) { settings.cityRef = c.Ref; store.set("settings", settings); npInfo(); renderCmp(); }
+  }).catch(() => {});
+  npInfo();
 }
 
 /* ---------- навигация ---------- */

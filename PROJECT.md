@@ -12,6 +12,8 @@ site/  — PWA без сборки (vanilla JS), ставится на теле�
 - Git в репо: `user.email = 34916749+Simracingshark@users.noreply.github.com` (локально в репо). Actions коммитят от `github-actions[bot]`.
 - Сборщик только на stdlib Python (urllib, re, json), зависимостей нет. В Actions Python 3.12, локально 3.14.
 
+Браузер напрямую ходит в API Новой Почты (`api.novaposhta.ua/v2.0/json/`, без ключа) за поиском города и тарифом доставки.
+
 ## Структура
 ```
 scraper/run.py            главный скрипт; аргументы — id магазинов (пусто = все)

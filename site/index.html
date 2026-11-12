@@ -109,12 +109,10 @@
   <section id="v-set" class="view">
     <article class="panel">
       <header><span class="ico">📍</span><h2>Доставка</h2></header>
-      <label class="field"><span>Моє місто</span><div class="inp"><input id="s-city" type="text" placeholder="наприклад, Київ"></div></label>
-      <div class="grid2">
-        <label class="field"><span>Доставка НП за замовч.</span><div class="inp"><input id="s-del" type="number" inputmode="decimal"><i>₴</i></div></label>
-        <label class="field"><span>Безкоштовно від</span><div class="inp"><input id="s-free" type="number" inputmode="decimal" placeholder="0"><i>₴</i></div></label>
-      </div>
-      <p class="hint">Тариф Нової Пошти залежить від ваги й маршруту. Перевір у їхньому калькуляторі й впиши своє типове значення.</p>
+      <label class="field"><span>Моє місто</span><div class="inp"><input id="s-city" type="text" list="s-cities" autocomplete="off" placeholder="почни вводити, напр. Демидів"></div></label>
+      <datalist id="s-cities"></datalist>
+      <label class="field"><span>Безкоштовна доставка від</span><div class="inp"><input id="s-free" type="number" inputmode="decimal" placeholder="0"><i>₴</i></div></label>
+      <p class="hint" id="s-np"></p>
     </article>
     <h3 class="sec">Джерела даних</h3>
     <ul id="shops" class="shops"></ul>
